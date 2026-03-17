@@ -1,0 +1,15 @@
+experiment:
+  name: baseline_from_scratch
+  initialization: from_scratch
+  dataset_config: configs/datasets/replica.yaml
+  prior_config: null
+  retrieval_mode: none
+  alignment_mode: none
+  adaptation: none
+  prior_object_id: null
+
+trainer:
+  max_steps: 10000
+  target_quality:
+    metric: psnr
+    value: 28.0

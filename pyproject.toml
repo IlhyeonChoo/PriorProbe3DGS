@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "priorprobe3dgs"
+version = "0.1.0"
+description = "Scaffold for controlled prior-reuse experiments in 3D Gaussian Splatting."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "PyYAML>=6.0",
+    "torch==2.7.1",
+    "torchvision==0.22.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0,<9",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true

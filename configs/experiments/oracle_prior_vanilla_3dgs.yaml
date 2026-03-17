@@ -1,0 +1,29 @@
+experiment:
+  name: oracle_prior_vanilla_3dgs
+  initialization: prior
+  reconstruction_backend: vanilla_3dgs
+  dataset_config: configs/datasets/replica.yaml
+  prior_config: configs/priors/shapesplat.yaml
+  retrieval_mode: oracle
+  alignment_mode: oracle_manual
+  adaptation: none
+  prior_object_id: chair_basic
+
+backend:
+  repo_path: ../3DGS/gaussian-splatting
+  python_executable: ../3DGS/gaussian-splatting/venv/bin/python
+  source_path: /path/to/colmap_scene
+  model_path: CHANGE_ME_DATASET_OUTPUT
+  disable_viewer: true
+  quiet: true
+  dry_run: false
+
+prior_alignment:
+  transform_path: configs/alignments/identity.json
+
+trainer:
+  iterations: 1000
+  sh_degree: 3
+  test_iterations: [1000]
+  save_iterations: [1000]
+  checkpoint_iterations: []

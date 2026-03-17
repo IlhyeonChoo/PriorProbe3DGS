@@ -1,0 +1,24 @@
+dataset:
+  name: replica
+  phase: A
+  root: data/public_datasets/replica_colmap
+  format: colmap
+  default_scene_id: room_0
+  source_path_template: "{root}/{scene_id}"
+  images: images
+  depths: ""
+  eval: false
+  white_background: false
+  scene_type: controlled_indoor
+  object_count_range: [1, 3]
+  occlusion_buckets:
+    - low
+    - high
+  notes:
+    - ShapeSplat prior는 source prior로만 사용하고, reconstruction target scene은 외부 공개 데이터셋에서 가져온다.
+    - 각 scene은 vanilla 3DGS가 읽을 수 있는 COLMAP 레이아웃(images, sparse/0)을 가져야 한다.
+  scenes:
+    room_0:
+      relative_path: room_0
+    office_0:
+      relative_path: office_0
