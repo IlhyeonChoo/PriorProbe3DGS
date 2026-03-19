@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Packaging
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Data and artifacts
+data/*
+!data/README.md
+!data/**/
+data/**/*
+!data/**/.gitkeep
+!data/**/README.md
+!data/**/scene_meta.json
+outputs/*
+!outputs/.gitkeep
+logs/*
+!logs/.gitkeep

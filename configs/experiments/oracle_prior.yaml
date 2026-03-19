@@ -1,0 +1,15 @@
+experiment:
+  name: oracle_prior
+  initialization: prior
+  dataset_config: configs/datasets/replica.yaml
+  prior_config: configs/priors/shapesplat.yaml
+  retrieval_mode: oracle
+  alignment_mode: automatic
+  adaptation: none
+  prior_object_id: chair_basic
+
+trainer:
+  max_steps: 10000
+  target_quality:
+    metric: psnr
+    value: 28.0

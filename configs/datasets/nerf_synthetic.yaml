@@ -1,0 +1,22 @@
+dataset:
+  name: nerf_synthetic
+  phase: A
+  root: data/public_datasets/nerf_synthetic
+  format: blender
+  default_scene_id: lego
+  source_path_template: "{root}/{scene_id}"
+  images: images
+  depths: ""
+  eval: false
+  white_background: true
+  scene_type: synthetic_object
+  object_count_range: [1, 1]
+  occlusion_buckets:
+    - low
+  notes:
+    - Blender `transforms_train.json` 형식을 그대로 사용하는 quick smoke/evaluation용 공개 데이터셋 템플릿이다.
+  scenes:
+    lego:
+      relative_path: lego
+    chair:
+      relative_path: chair

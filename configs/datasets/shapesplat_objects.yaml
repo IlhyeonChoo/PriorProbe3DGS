@@ -1,0 +1,23 @@
+dataset:
+  name: shapesplat_objects
+  phase: A
+  root: data/public_datasets/shapesplat_objects_colmap
+  format: colmap
+  default_scene_id: chair_basic
+  source_path_template: "{root}/{scene_id}"
+  images: images
+  depths: ""
+  eval: false
+  white_background: false
+  scene_type: object_centric
+  object_count_range: [1, 1]
+  occlusion_buckets:
+    - low
+  notes:
+    - ShapeSplat 공개 object data를 vanilla 3DGS가 읽을 수 있는 COLMAP-compatible 레이아웃으로 export한 타깃 세트 템플릿이다.
+    - prior source와 reconstruction target이 같은 object family를 공유할 수 있으므로 일반화 비교에서는 split 누수를 별도로 통제해야 한다.
+  scenes:
+    chair_basic:
+      relative_path: chair_basic
+    lamp_domain:
+      relative_path: lamp_domain

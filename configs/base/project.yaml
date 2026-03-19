@@ -1,0 +1,22 @@
+project:
+  name: PriorProbe3DGS
+  stage: 1
+  description: Controlled evaluation of prior reuse in 3D Gaussian Splatting
+
+runtime:
+  seed: 42
+  device: cuda
+  outputs_dir: outputs
+  logs_dir: logs
+
+metrics:
+  primary:
+    - total_optimization_time
+    - time_to_target_quality
+  secondary:
+    - psnr
+    - ssim
+    - lpips
+    - retrieval_accuracy
+    - alignment_success_rate
+    - gaussian_count
