@@ -1,0 +1,33 @@
+{
+  "source_prior": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/modelnet_chair/assets/chair/chair_0240/splat.ply",
+  "aligned_prior": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs/office_0/prior_init/aligned_prior.ply",
+  "asset_format": "gaussian",
+  "alignment": {
+    "scale": 0.9100337624549866,
+    "rotation_matrix": [
+      [
+        0.9723061919212341,
+        -0.23368306457996368,
+        -0.003593174507841468
+      ],
+      [
+        0.2336849570274353,
+        0.9723123908042908,
+        0.00011026282300008461
+      ],
+      [
+        0.0034679214004427195,
+        -0.0009468800853937864,
+        0.9999935626983643
+      ]
+    ],
+    "translation": [
+      0.4183086156845093,
+      0.14526568353176117,
+      -0.7558320760726929
+    ]
+  },
+  "prior_object_id": "chair_0240",
+  "prior_score": 0.9918091893196106,
+  "init_mode": "merge"
+}

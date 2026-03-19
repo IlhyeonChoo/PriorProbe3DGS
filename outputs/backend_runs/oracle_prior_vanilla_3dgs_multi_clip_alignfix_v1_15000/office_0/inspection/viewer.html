@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang='en'>
+<head>
+  <meta charset='utf-8'>
+  <title>PriorProbe3DGS Initial Snapshot Viewer</title>
+  <style>
+    body { font-family: sans-serif; margin: 24px; color: #111; }
+    h1, h2 { margin-bottom: 8px; }
+    .muted { color: #555; }
+    img { max-width: 100%; border: 1px solid #ddd; margin: 8px 0 20px; }
+    table { border-collapse: collapse; margin: 12px 0 24px; }
+    th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; vertical-align: top; }
+    code { background: #f6f6f6; padding: 1px 4px; }
+  </style>
+</head>
+<body>
+  <h1>Initial Snapshot Viewer</h1>
+  <p class='muted'>backend run: <code>/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip_alignfix_v1_15000/office_0</code></p>
+  <p class='muted'>scene root: <code>/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/office_0</code></p>
+  <h2>Summary</h2>
+  <table>
+    <tr><th>Scene</th><td>office_0</td></tr>
+    <tr><th>Initialization</th><td>from_scratch</td></tr>
+    <tr><th>Selected priors</th><td>sofa_0131, sofa_0131, table_0230, chair_0239</td></tr>
+  </table>
+  <h2>Generated Visuals</h2>
+  <h3>Initial train contact sheet</h3>
+  <img src='initial_train_contact_sheet.png' alt='Initial train contact sheet'>
+  <h3>Initial test contact sheet</h3>
+  <img src='initial_test_contact_sheet.png' alt='Initial test contact sheet'>
+  <h3>Scene sparse + aligned priors</h3>
+  <img src='prior_projection_sheet.png' alt='Scene sparse + aligned priors'>
+  <h3>Target crops vs selected prior renders</h3>
+  <img src='retrieval_contact_sheet.png' alt='Target crops vs selected prior renders'>
+  <h2>Selected Priors</h2>
+  <table>
+    <tr><th>Target</th><th>Category</th><th>Prior</th><th>Score</th><th>Aligned PLY</th></tr>
+    <tr><td>9</td><td>sofa</td><td>sofa_0131</td><td>0.6894</td><td><a href='../prior_init/aligned_prior_00.ply'>aligned_prior_00.ply</a></td></tr>
+    <tr><td>7</td><td>sofa</td><td>sofa_0131</td><td>0.7219</td><td><a href='../prior_init/aligned_prior_01.ply'>aligned_prior_01.ply</a></td></tr>
+    <tr><td>58</td><td>table</td><td>table_0230</td><td>0.8115</td><td><a href='../prior_init/aligned_prior_02.ply'>aligned_prior_02.ply</a></td></tr>
+    <tr><td>61</td><td>chair</td><td>chair_0239</td><td>0.7102</td><td><a href='../prior_init/aligned_prior_03.ply'>aligned_prior_03.ply</a></td></tr>
+  </table>
+  <h2>Useful Paths</h2>
+  <ul>
+    <li><a href='../../../../../../../../../mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/office_0/images'>scene images</a></li>
+    <li><a href='../point_cloud/iteration_0/point_cloud.ply'>iteration_0 point cloud</a></li>
+    <li><a href='../test/ours_0/renders'>iter0 test renders</a></li>
+    <li><a href='../test/ours_0/gt'>iter0 test gt</a></li>
+  </ul>
+</body>
+</html>

@@ -55,10 +55,13 @@ outputs/experiments/**/*
 !outputs/backend_runs/
 outputs/backend_runs/**/*
 !outputs/backend_runs/**/
+# Keep lightweight backend metadata and qualitative summaries only.
 !outputs/backend_runs/**/*.json
 !outputs/backend_runs/**/cfg_args
-!outputs/backend_runs/**/point_cloud/**/point_cloud.ply
-!outputs/backend_runs/**/prior_init/aligned_prior.ply
+!outputs/backend_runs/**/inspection/**/*.html
+!outputs/backend_runs/**/inspection/**/*.png
+!outputs/backend_runs/**/prior_init/aligned_prior*.ply
+outputs/backend_runs/**/._*
 !outputs/prior_library/
 outputs/prior_library/**/*
 !outputs/prior_library/**/
