@@ -12,8 +12,7 @@ if str(SRC) not in sys.path:
 
 import yaml
 
-from priorprobe.prior_library.library import PriorEntry, PriorLibrary
-from priorprobe.prior_library.metadata import PriorMetadata
+from priorprobe.prior_assets import build_prior_library
 
 
 def load_yaml(path: Path) -> dict:
@@ -25,35 +24,13 @@ def resolve_path(path_str: str) -> Path:
     return path if path.is_absolute() else ROOT / path
 
 
-def build_library(config: dict) -> PriorLibrary:
-    library = PriorLibrary()
-    library_config = config["library"]
-    for item in library_config.get("default_objects", []):
-        metadata = PriorMetadata(
-            category=item["category"],
-            source=library_config.get("source", "unknown"),
-            scale_meters=tuple(item["scale_meters"]) if item.get("scale_meters") else None,
-            tags=tuple(item.get("tags", [])),
-        )
-        library.add_entry(
-            PriorEntry(
-                object_id=item["object_id"],
-                category=item["category"],
-                gaussian_path=Path(item["gaussian_path"]),
-                feature_path=Path(item["feature_path"]) if item.get("feature_path") else None,
-                metadata=metadata,
-            )
-        )
-    return library
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="Initialize the prior-library manifest.")
     parser.add_argument("--config", required=True, type=Path, help="Path to prior YAML config.")
     args = parser.parse_args()
 
     config = load_yaml(resolve_path(str(args.config)))
-    library = build_library(config)
+    library = build_prior_library(config, root=ROOT)
     manifest_path = resolve_path(config["library"]["manifest_path"])
     library.dump_manifest(manifest_path)
     print(f"Prepared prior-library manifest at {manifest_path}")

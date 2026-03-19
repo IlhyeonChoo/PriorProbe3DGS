@@ -11,7 +11,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from priorprobe.evaluation.metrics import summarize_run
+from priorprobe.evaluation.metrics import summarize_backend_run, summarize_run
 from priorprobe.optimization.trainer import TrainingRun
 
 
@@ -24,12 +24,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Recompute evaluation from a run summary.")
     parser.add_argument("--run-summary", required=True, type=Path)
     parser.add_argument("--output", type=Path, help="Optional output path for evaluation JSON.")
+    parser.add_argument("--target-psnr", type=float, help="Optional target PSNR for time-to-target computation.")
     args = parser.parse_args()
 
     run_summary_path = resolve_path(str(args.run_summary))
     payload = json.loads(run_summary_path.read_text(encoding="utf-8"))
-    run = TrainingRun.from_dict(payload)
-    evaluation = summarize_run(run)
+    if payload.get("backend") == "vanilla_3dgs" or run_summary_path.name == "backend_run.json":
+        evaluation = summarize_backend_run(run_summary_path, target_psnr=args.target_psnr)
+    else:
+        run = TrainingRun.from_dict(payload)
+        evaluation = summarize_run(run)
 
     if args.output is None:
         output_path = run_summary_path.with_name("evaluation.json")

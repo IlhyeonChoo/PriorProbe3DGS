@@ -1,0 +1,33 @@
+{
+  "experiment_name": "baseline_smoke_vanilla_3dgs",
+  "backend": "vanilla_3dgs",
+  "initialization": "from_scratch",
+  "status": "completed",
+  "dataset_name": "replica",
+  "scene_id": "office_0",
+  "model_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_smoke_vanilla_3dgs/office_0",
+  "total_optimization_time_sec": 2.670856038108468,
+  "time_to_target_quality_sec": null,
+  "target_psnr": null,
+  "final_iteration": 1,
+  "psnr": 8.195902824401855,
+  "ssim": 0.024942396208643913,
+  "lpips": 0.8737056851387024,
+  "retrieval_accuracy": null,
+  "alignment_success_rate": null,
+  "gaussian_count": 100000,
+  "prior_object_id": null,
+  "prior_category": null,
+  "checkpoint_metrics": [
+    {
+      "iteration": 1,
+      "method": "ours_1",
+      "psnr": 8.195902824401855,
+      "ssim": 0.024942396208643913,
+      "lpips": 0.8737056851387024,
+      "gaussian_count": 100000,
+      "estimated_elapsed_sec": 2.670856
+    }
+  ],
+  "warnings": []
+}

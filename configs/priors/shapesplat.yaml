@@ -1,3 +1,12 @@
+asset_prep:
+  feature_backend: open_clip
+  feature_model_name: ViT-B-32
+  feature_pretrained: laion2b_s34b_b79k
+  render_sample_count: 8
+  min_render_count: 8
+  allow_fallback: true
+  device: cuda
+
 library:
   name: shapesplat
   source: shapesplat
@@ -5,15 +14,23 @@ library:
   default_objects:
     - object_id: chair_basic
       category: chair
-      gaussian_path: data/priors/shapesplat/chair_basic.ply
-      feature_path: data/priors/shapesplat/chair_basic.npy
+      source_split: official_subset
+      source_gaussian_path: CHANGE_ME_SHAPESPLAT_CHAIR_BASIC_SPLAT
+      source_render_dir: CHANGE_ME_SHAPESPLAT_CHAIR_BASIC_RENDERS
+      gaussian_path: data/priors/shapesplat/assets/chair/chair_basic/splat.ply
+      render_dir: data/priors/shapesplat/assets/chair/chair_basic/renders
+      feature_path: data/priors/shapesplat/features/chair/chair_basic.npy
       placeholder: true
       scale_meters: [0.60, 0.90, 0.60]
       tags: [baseline, indoor]
     - object_id: lamp_domain
       category: lamp
-      gaussian_path: data/priors/shapesplat/lamp_domain.ply
-      feature_path: data/priors/shapesplat/lamp_domain.npy
+      source_split: official_subset
+      source_gaussian_path: CHANGE_ME_SHAPESPLAT_LAMP_DOMAIN_SPLAT
+      source_render_dir: CHANGE_ME_SHAPESPLAT_LAMP_DOMAIN_RENDERS
+      gaussian_path: data/priors/shapesplat/assets/lamp/lamp_domain/splat.ply
+      render_dir: data/priors/shapesplat/assets/lamp/lamp_domain/renders
+      feature_path: data/priors/shapesplat/features/lamp/lamp_domain.npy
       placeholder: true
       scale_meters: [0.20, 0.45, 0.20]
       tags: [domain, indoor]

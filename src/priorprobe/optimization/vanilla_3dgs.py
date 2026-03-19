@@ -44,6 +44,9 @@ class Vanilla3DGSBackendConfig:
     eval: bool = False
     quiet: bool = False
     dry_run: bool = False
+    init_mode: str = "merge"
+    save_initial_snapshot: bool = False
+    initial_render_sets: tuple[str, ...] = ()
     extra_args: tuple[str, ...] = ()
 
     @classmethod
@@ -53,11 +56,13 @@ class Vanilla3DGSBackendConfig:
         *,
         root: Path,
         trainer_payload: dict[str, Any] | None = None,
+        artifacts_payload: dict[str, Any] | None = None,
         source_override: Path | None = None,
         model_override: Path | None = None,
         dry_run_override: bool | None = None,
     ) -> "Vanilla3DGSBackendConfig":
         trainer_payload = trainer_payload or {}
+        artifacts_payload = artifacts_payload or {}
 
         def resolve_path(path_value: str | None) -> Path | None:
             if path_value is None:
@@ -103,6 +108,9 @@ class Vanilla3DGSBackendConfig:
             eval=bool(payload.get("eval", False)),
             quiet=bool(payload.get("quiet", False)),
             dry_run=dry_run,
+            init_mode=str(payload.get("init_mode", "merge")),
+            save_initial_snapshot=bool(artifacts_payload.get("save_initial_snapshot", False)),
+            initial_render_sets=_as_str_tuple(artifacts_payload.get("initial_render_sets")),
             extra_args=_as_str_tuple(payload.get("extra_args")),
         )
 
@@ -124,6 +132,7 @@ def build_train_command(
     alignment_json: Path | None = None,
     prior_object_id: str | None = None,
     prior_score: float | None = None,
+    prior_spec_json: Path | None = None,
 ) -> list[str]:
     command = [
         str(resolve_backend_python(config)),
@@ -162,15 +171,25 @@ def build_train_command(
         command.append("--eval")
     if config.quiet:
         command.append("--quiet")
+    if config.save_initial_snapshot:
+        command.append("--save-initial-snapshot")
+    if config.initial_render_sets:
+        command.append("--initial-render-sets")
+        command.extend(config.initial_render_sets)
 
     if prior_ply is not None:
         command.extend(["--prior-ply", str(prior_ply)])
+        command.extend(["--init-mode", config.init_mode])
+    elif prior_spec_json is not None:
+        command.extend(["--init-mode", config.init_mode])
     if alignment_json is not None:
         command.extend(["--alignment-json", str(alignment_json)])
     if prior_object_id is not None:
         command.extend(["--prior-object-id", prior_object_id])
     if prior_score is not None:
         command.extend(["--prior-score", str(prior_score)])
+    if prior_spec_json is not None:
+        command.extend(["--prior-spec-json", str(prior_spec_json)])
 
     command.extend(config.extra_args)
     return command

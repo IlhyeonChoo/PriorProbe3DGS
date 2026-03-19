@@ -1,0 +1,15 @@
+{
+  "experiment_name": "oracle_prior",
+  "initialization": "prior",
+  "steps": 10000,
+  "wall_time_sec": 600.0,
+  "target_metric": "psnr",
+  "target_value": 28.0,
+  "prior_object_id": "chair_basic",
+  "alignment_mode": "automatic",
+  "adaptation": "none",
+  "notes": [
+    "scaffold run",
+    "replace with actual 3DGS backend"
+  ]
+}

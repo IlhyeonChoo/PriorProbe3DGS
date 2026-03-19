@@ -1,0 +1,88 @@
+{
+  "experiment_name": "baseline_from_scratch_vanilla_3dgs_multi_15000",
+  "backend": "vanilla_3dgs",
+  "initialization": "from_scratch",
+  "status": "pending",
+  "repo_path": "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting",
+  "source_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0",
+  "model_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_from_scratch_vanilla_3dgs_multi_15000/room_0",
+  "dataset_scene": {
+    "dataset_name": "replica",
+    "scene_id": "room_0",
+    "format": "colmap",
+    "source_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0",
+    "images": "images",
+    "depths": "",
+    "eval": true,
+    "white_background": false,
+    "notes": [
+      "Replica multi-object oracle exports are staged on SSD for actual training runs.",
+      "Scene subsets are rendered with scene-centric camera paths for top-K supported objects."
+    ]
+  },
+  "command": [
+    "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python",
+    "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/scripts/train_vanilla_3dgs_backend.py",
+    "--repo-path",
+    "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting",
+    "--source_path",
+    "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0",
+    "--model_path",
+    "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_from_scratch_vanilla_3dgs_multi_15000/room_0",
+    "--images",
+    "images",
+    "--sh_degree",
+    "3",
+    "--iterations",
+    "15000",
+    "--test_iterations",
+    "500",
+    "1000",
+    "2000",
+    "3000",
+    "5000",
+    "7000",
+    "10000",
+    "15000",
+    "--save_iterations",
+    "500",
+    "1000",
+    "2000",
+    "3000",
+    "5000",
+    "7000",
+    "10000",
+    "15000",
+    "--disable_viewer",
+    "--eval",
+    "--quiet",
+    "--save-initial-snapshot",
+    "--initial-render-sets",
+    "train",
+    "test"
+  ],
+  "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/scripts/train_vanilla_3dgs_backend.py --repo-path /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting --source_path /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0 --model_path /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_from_scratch_vanilla_3dgs_multi_15000/room_0 --images images --sh_degree 3 --iterations 15000 --test_iterations 500 1000 2000 3000 5000 7000 10000 15000 --save_iterations 500 1000 2000 3000 5000 7000 10000 15000 --disable_viewer --eval --quiet --save-initial-snapshot --initial-render-sets train test",
+  "alignment_json": null,
+  "prior_spec_json": null,
+  "generated_alignment": null,
+  "generated_alignments": [],
+  "initial_snapshot": {
+    "point_cloud": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_from_scratch_vanilla_3dgs_multi_15000/room_0/point_cloud/iteration_0/point_cloud.ply",
+    "render_sets": {
+      "train": {
+        "renders": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_from_scratch_vanilla_3dgs_multi_15000/room_0/train/ours_0/renders",
+        "gt": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_from_scratch_vanilla_3dgs_multi_15000/room_0/train/ours_0/gt"
+      },
+      "test": {
+        "renders": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_from_scratch_vanilla_3dgs_multi_15000/room_0/test/ours_0/renders",
+        "gt": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_from_scratch_vanilla_3dgs_multi_15000/room_0/test/ours_0/gt"
+      }
+    }
+  },
+  "selected_prior": null,
+  "selected_priors": [],
+  "oracle_target": null,
+  "oracle_targets": [],
+  "render_runs": [],
+  "metrics_run": null
+}

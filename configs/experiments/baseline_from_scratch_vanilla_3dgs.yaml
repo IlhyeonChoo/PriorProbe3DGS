@@ -19,8 +19,8 @@ backend:
   dry_run: false
 
 trainer:
-  iterations: 1000
+  iterations: 7000
   sh_degree: 3
-  test_iterations: [1000]
-  save_iterations: [1000]
+  test_iterations: [500, 1000, 2000, 3000, 5000, 7000]
+  save_iterations: [500, 1000, 2000, 3000, 5000, 7000]
   checkpoint_iterations: []

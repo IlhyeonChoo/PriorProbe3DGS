@@ -1,0 +1,33 @@
+{
+  "experiment_name": "baseline_smoke_vanilla_3dgs",
+  "backend": "vanilla_3dgs",
+  "initialization": "from_scratch",
+  "status": "completed",
+  "dataset_name": "replica",
+  "scene_id": "room_0",
+  "model_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_smoke_vanilla_3dgs/room_0",
+  "total_optimization_time_sec": 2.311260546091944,
+  "time_to_target_quality_sec": null,
+  "target_psnr": null,
+  "final_iteration": 1,
+  "psnr": 9.30715274810791,
+  "ssim": 0.07447542995214462,
+  "lpips": 0.8176722526550293,
+  "retrieval_accuracy": null,
+  "alignment_success_rate": null,
+  "gaussian_count": 100000,
+  "prior_object_id": null,
+  "prior_category": null,
+  "checkpoint_metrics": [
+    {
+      "iteration": 1,
+      "method": "ours_1",
+      "psnr": 9.30715274810791,
+      "ssim": 0.07447542995214462,
+      "lpips": 0.8176722526550293,
+      "gaussian_count": 100000,
+      "estimated_elapsed_sec": 2.311261
+    }
+  ],
+  "warnings": []
+}

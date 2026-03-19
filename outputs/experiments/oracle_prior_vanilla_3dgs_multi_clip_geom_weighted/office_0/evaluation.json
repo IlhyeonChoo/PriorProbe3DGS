@@ -1,0 +1,85 @@
+{
+  "experiment_name": "oracle_prior_vanilla_3dgs_multi_clip_geom_weighted",
+  "backend": "vanilla_3dgs",
+  "initialization": "prior",
+  "status": "completed",
+  "dataset_name": "replica",
+  "scene_id": "office_0",
+  "model_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip_geom_weighted/office_0",
+  "total_optimization_time_sec": 150.00131162907928,
+  "time_to_target_quality_sec": null,
+  "target_psnr": null,
+  "final_iteration": 7000,
+  "psnr": 12.988173484802246,
+  "ssim": 0.5622719526290894,
+  "lpips": 0.36386701464653015,
+  "retrieval_accuracy": 0.7970355898141861,
+  "alignment_success_rate": null,
+  "gaussian_count": 2006432,
+  "prior_object_id": "sofa_0128",
+  "prior_category": "sofa",
+  "prior_object_ids": [
+    "sofa_0128",
+    "sofa_0065",
+    "table_0230",
+    "chair_0239"
+  ],
+  "prior_count": 4,
+  "checkpoint_metrics": [
+    {
+      "iteration": 500,
+      "method": "ours_500",
+      "psnr": 10.677247047424316,
+      "ssim": 0.264611154794693,
+      "lpips": 0.660258948802948,
+      "gaussian_count": 146584,
+      "estimated_elapsed_sec": 10.714379
+    },
+    {
+      "iteration": 1000,
+      "method": "ours_1000",
+      "psnr": 11.580265045166016,
+      "ssim": 0.3940823972225189,
+      "lpips": 0.5122575163841248,
+      "gaussian_count": 224010,
+      "estimated_elapsed_sec": 21.428759
+    },
+    {
+      "iteration": 2000,
+      "method": "ours_2000",
+      "psnr": 12.251057624816895,
+      "ssim": 0.479915976524353,
+      "lpips": 0.4335871934890747,
+      "gaussian_count": 773722,
+      "estimated_elapsed_sec": 42.857518
+    },
+    {
+      "iteration": 3000,
+      "method": "ours_3000",
+      "psnr": 12.488553047180176,
+      "ssim": 0.5074443221092224,
+      "lpips": 0.4080969989299774,
+      "gaussian_count": 1241054,
+      "estimated_elapsed_sec": 64.286276
+    },
+    {
+      "iteration": 5000,
+      "method": "ours_5000",
+      "psnr": 12.852677345275879,
+      "ssim": 0.5478342175483704,
+      "lpips": 0.37584853172302246,
+      "gaussian_count": 1741318,
+      "estimated_elapsed_sec": 107.143794
+    },
+    {
+      "iteration": 7000,
+      "method": "ours_7000",
+      "psnr": 12.988173484802246,
+      "ssim": 0.5622719526290894,
+      "lpips": 0.36386701464653015,
+      "gaussian_count": 2006432,
+      "estimated_elapsed_sec": 150.001312
+    }
+  ],
+  "warnings": []
+}

@@ -1,0 +1,10 @@
+{
+  "total_optimization_time_sec": 800.0,
+  "time_to_target_quality_sec": 600.0,
+  "psnr": 26.0,
+  "ssim": 0.87,
+  "lpips": 0.16,
+  "retrieval_accuracy": null,
+  "alignment_success_rate": null,
+  "gaussian_count": 120000
+}

@@ -1,0 +1,93 @@
+{
+  "experiment_name": "baseline_smoke_vanilla_3dgs",
+  "backend": "vanilla_3dgs",
+  "initialization": "from_scratch",
+  "status": "completed",
+  "repo_path": "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting",
+  "source_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap/office_0",
+  "model_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_smoke_vanilla_3dgs/office_0",
+  "dataset_scene": {
+    "dataset_name": "replica",
+    "scene_id": "office_0",
+    "format": "colmap",
+    "source_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap/office_0",
+    "images": "images",
+    "depths": "",
+    "eval": true,
+    "white_background": false,
+    "notes": [
+      "ShapeSplat prior\ub294 source prior\ub85c\ub9cc \uc0ac\uc6a9\ud558\uace0, reconstruction target scene\uc740 \uc678\ubd80 \uacf5\uac1c \ub370\uc774\ud130\uc14b\uc5d0\uc11c \uac00\uc838\uc628\ub2e4.",
+      "\uac01 scene\uc740 vanilla 3DGS\uac00 \uc77d\uc744 \uc218 \uc788\ub294 COLMAP \ub808\uc774\uc544\uc6c3(images, sparse/0)\uc744 \uac00\uc838\uc57c \ud55c\ub2e4."
+    ]
+  },
+  "command": [
+    "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python",
+    "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/scripts/train_vanilla_3dgs_backend.py",
+    "--repo-path",
+    "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting",
+    "--source_path",
+    "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap/office_0",
+    "--model_path",
+    "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_smoke_vanilla_3dgs/office_0",
+    "--images",
+    "images",
+    "--sh_degree",
+    "3",
+    "--iterations",
+    "1",
+    "--test_iterations",
+    "1",
+    "--save_iterations",
+    "1",
+    "--disable_viewer",
+    "--eval",
+    "--quiet"
+  ],
+  "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/scripts/train_vanilla_3dgs_backend.py --repo-path /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting --source_path /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap/office_0 --model_path /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_smoke_vanilla_3dgs/office_0 --images images --sh_degree 3 --iterations 1 --test_iterations 1 --save_iterations 1 --disable_viewer --eval --quiet",
+  "alignment_json": null,
+  "generated_alignment": null,
+  "selected_prior": null,
+  "oracle_target": null,
+  "render_runs": [
+    {
+      "iteration": 1,
+      "command": [
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python",
+        "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py",
+        "--source_path",
+        "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap/office_0",
+        "--model_path",
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_smoke_vanilla_3dgs/office_0",
+        "--images",
+        "images",
+        "--iteration",
+        "1",
+        "--skip_train",
+        "--eval",
+        "--quiet"
+      ],
+      "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py --source_path /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap/office_0 --model_path /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_smoke_vanilla_3dgs/office_0 --images images --iteration 1 --skip_train --eval --quiet",
+      "return_code": 0,
+      "elapsed_sec": 2.689469862729311,
+      "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/baseline_smoke_vanilla_3dgs/office_0/render_1_stdout.log",
+      "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/baseline_smoke_vanilla_3dgs/office_0/render_1_stderr.log"
+    }
+  ],
+  "metrics_run": {
+    "command": [
+      "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python",
+      "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/metrics.py",
+      "--model_paths",
+      "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_smoke_vanilla_3dgs/office_0"
+    ],
+    "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/metrics.py --model_paths /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/baseline_smoke_vanilla_3dgs/office_0",
+    "return_code": 0,
+    "elapsed_sec": 6.564853628631681,
+    "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/baseline_smoke_vanilla_3dgs/office_0/metrics_stdout.log",
+    "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/baseline_smoke_vanilla_3dgs/office_0/metrics_stderr.log"
+  },
+  "return_code": 0,
+  "elapsed_sec": 2.670856038108468,
+  "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/baseline_smoke_vanilla_3dgs/office_0/backend_stdout.log",
+  "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/baseline_smoke_vanilla_3dgs/office_0/backend_stderr.log"
+}
