@@ -1,0 +1,41 @@
+experiment:
+  name: oracle_prior_vanilla_3dgs_multi_clip_geom_15000
+  initialization: prior
+  reconstruction_backend: vanilla_3dgs
+  # NOTE: ShapeSplat priors come from synthetic CAD/object render data, while Replica exports
+  # are rendered from realistic indoor scenes. Revisit this setting on a CAD-based synthetic
+  # indoor dataset to isolate domain-gap effects from retrieval/insertion effects.
+  dataset_config: configs/datasets/replica_multi_shared.yaml
+  prior_config: configs/priors/generated/shapesplat_modelnet_bundle_clip_geom_shared.yaml
+  retrieval_mode: oracle_category
+  alignment_mode: oracle_manual
+  adaptation: none
+  prior_object_id: null
+  feature_backend: clip_geom
+
+oracle:
+  categories: [chair, sofa, table, lamp]
+  max_objects: 4
+
+backend:
+  repo_path: ../3DGS/gaussian-splatting
+  python_executable: ../3DGS/gaussian-splatting/venv/bin/python
+  source_path: /path/to/colmap_scene
+  model_path: CHANGE_ME_DATASET_OUTPUT
+  disable_viewer: true
+  quiet: true
+  dry_run: false
+  init_mode: merge
+
+artifacts:
+  save_initial_snapshot: true
+  initial_render_sets: [train, test]
+
+prior_alignment: {}
+
+trainer:
+  iterations: 15000
+  sh_degree: 3
+  test_iterations: [500, 1000, 2000, 3000, 5000, 7000, 10000, 15000]
+  save_iterations: [500, 1000, 2000, 3000, 5000, 7000, 10000, 15000]
+  checkpoint_iterations: []

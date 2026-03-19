@@ -8,6 +8,7 @@ import os
 import shutil
 import sys
 import types
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,7 @@ if "--disable_viewer" in sys.argv:
 
 import numpy as np
 import torch
+import torchvision
 from plyfile import PlyData, PlyElement
 from torch import nn
 
@@ -55,6 +57,7 @@ train_module = importlib.import_module("train")
 scene_module = importlib.import_module("scene")
 dataset_readers = importlib.import_module("scene.dataset_readers")
 arguments_module = importlib.import_module("arguments")
+gaussian_renderer_module = importlib.import_module("gaussian_renderer")
 
 ModelParams = arguments_module.ModelParams
 OptimizationParams = arguments_module.OptimizationParams
@@ -136,7 +139,7 @@ def quaternion_multiply(q_left: np.ndarray, q_right: np.ndarray) -> np.ndarray:
     return quat / np.linalg.norm(quat)
 
 
-def parse_scale(scale_value: Any) -> tuple[np.ndarray, float]:
+def parse_scale(scale_value: Any, *, allow_anisotropic: bool = False) -> tuple[np.ndarray, float | None]:
     if isinstance(scale_value, (int, float)):
         scalar = float(scale_value)
         return np.asarray([scalar, scalar, scalar], dtype=np.float32), scalar
@@ -144,6 +147,8 @@ def parse_scale(scale_value: Any) -> tuple[np.ndarray, float]:
     scale = np.asarray(scale_value, dtype=np.float32)
     if scale.shape != (3,):
         raise ValueError("scale must be a scalar or a 3-vector")
+    if allow_anisotropic:
+        return scale, None
     if not np.allclose(scale, scale[0]):
         raise ValueError("Gaussian prior alignment currently supports isotropic scale only")
     return scale, float(scale[0])
@@ -202,15 +207,46 @@ def build_point_cloud_vertex(
     return output
 
 
+def build_point_cloud_from_gaussian_vertex(vertex: np.ndarray) -> np.ndarray:
+    xyz = np.stack([vertex["x"], vertex["y"], vertex["z"]], axis=1).astype(np.float32)
+    colors = np.stack([vertex["f_dc_0"], vertex["f_dc_1"], vertex["f_dc_2"]], axis=1).astype(np.float32)
+    colors = np.clip(dataset_readers.SH2RGB(colors), 0.0, 1.0)
+    dtype = [
+        ("x", "f4"),
+        ("y", "f4"),
+        ("z", "f4"),
+        ("nx", "f4"),
+        ("ny", "f4"),
+        ("nz", "f4"),
+        ("red", "u1"),
+        ("green", "u1"),
+        ("blue", "u1"),
+    ]
+    output = np.empty(xyz.shape[0], dtype=dtype)
+    output["x"] = xyz[:, 0]
+    output["y"] = xyz[:, 1]
+    output["z"] = xyz[:, 2]
+    output["nx"] = 0.0
+    output["ny"] = 0.0
+    output["nz"] = 0.0
+    output["red"] = np.round(colors[:, 0] * 255.0).astype(np.uint8)
+    output["green"] = np.round(colors[:, 1] * 255.0).astype(np.uint8)
+    output["blue"] = np.round(colors[:, 2] * 255.0).astype(np.uint8)
+    return output
+
+
 def prepare_prior_asset(prior_ply: Path, alignment_json: Path | None, output_path: Path) -> tuple[Path, str, dict[str, Any]]:
     alignment = load_alignment_spec(alignment_json)
     rotation_matrix = np.asarray(alignment["rotation_matrix"], dtype=np.float32)
     translation = np.asarray(alignment["translation"], dtype=np.float32)
-    scale_vec, scale_scalar = parse_scale(alignment["scale"])
 
     ply = PlyData.read(prior_ply)
     vertex = np.array(ply["vertex"].data, copy=True)
     asset_format = detect_asset_format(vertex)
+    scale_vec, scale_scalar = parse_scale(
+        alignment["scale"],
+        allow_anisotropic=asset_format == "point_cloud",
+    )
 
     xyz = np.stack([vertex["x"], vertex["y"], vertex["z"]], axis=1).astype(np.float32)
     xyz = transform_positions(
@@ -224,7 +260,7 @@ def prepare_prior_asset(prior_ply: Path, alignment_json: Path | None, output_pat
     vertex["z"] = xyz[:, 2]
 
     if asset_format == "gaussian":
-        if scale_scalar <= 0.0:
+        if scale_scalar is None or scale_scalar <= 0.0:
             raise ValueError("scale must be positive for gaussian priors")
         for field_name in ("scale_0", "scale_1", "scale_2"):
             vertex[field_name] = vertex[field_name] + np.float32(np.log(scale_scalar))
@@ -244,6 +280,167 @@ def prepare_prior_asset(prior_ply: Path, alignment_json: Path | None, output_pat
     return output_path, asset_format, alignment
 
 
+def load_prior_specs(path: Path) -> list[dict[str, Any]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, list):
+        raise ValueError(f"prior spec json must contain a list: {path}")
+    normalized: list[dict[str, Any]] = []
+    for index, item in enumerate(payload):
+        if not isinstance(item, dict):
+            raise ValueError(f"prior spec entry {index} is not an object")
+        if item.get("prior_ply") is None:
+            raise ValueError(f"prior spec entry {index} is missing prior_ply")
+        normalized.append(
+            {
+                "prior_ply": str(item["prior_ply"]),
+                "alignment_json": item.get("alignment_json"),
+                "prior_object_id": item.get("prior_object_id"),
+                "prior_score": item.get("prior_score"),
+                "normalized_confidence": item.get("normalized_confidence"),
+                "point_keep_ratio": item.get("point_keep_ratio"),
+                "dropped": item.get("dropped"),
+                "drop_reason": item.get("drop_reason"),
+                "target_object_id": item.get("target_object_id"),
+                "target_category": item.get("target_category"),
+                "alignment_debug": item.get("alignment_debug"),
+                "source_prior_path": item.get("source_prior_path"),
+                "canonical_seed_path": item.get("canonical_seed_path"),
+            }
+        )
+    return normalized
+
+
+def prepare_prior_assets(prior_specs: list[dict[str, Any]], model_path: Path) -> list[dict[str, Any]]:
+    prepared: list[dict[str, Any]] = []
+    for index, spec in enumerate(prior_specs):
+        prior_ply = Path(str(spec["prior_ply"])).resolve()
+        alignment_json = (
+            Path(str(spec["alignment_json"])).resolve()
+            if spec.get("alignment_json") is not None
+            else None
+        )
+        prepared_init_ply, prepared_asset_format, alignment = prepare_prior_asset(
+            prior_ply,
+            alignment_json,
+            model_path / "prior_init" / f"aligned_prior_{index:02d}.ply",
+        )
+        prepared.append(
+            {
+                "source_prior": str(prior_ply),
+                "aligned_prior": str(prepared_init_ply),
+                "asset_format": prepared_asset_format,
+                "alignment": alignment,
+                "prior_object_id": spec.get("prior_object_id"),
+                "prior_score": spec.get("prior_score"),
+                "normalized_confidence": spec.get("normalized_confidence"),
+                "point_keep_ratio": spec.get("point_keep_ratio"),
+                "dropped": spec.get("dropped"),
+                "drop_reason": spec.get("drop_reason"),
+                "target_object_id": spec.get("target_object_id"),
+                "target_category": spec.get("target_category"),
+                "alignment_debug": spec.get("alignment_debug"),
+                "source_prior_path": spec.get("source_prior_path"),
+                "canonical_seed_path": spec.get("canonical_seed_path"),
+            }
+        )
+    return prepared
+
+
+def prepared_asset_to_point_cloud(path: Path, asset_format: str):
+    if asset_format == "point_cloud":
+        return dataset_readers.fetchPly(str(path))
+    if asset_format != "gaussian":
+        raise ValueError(f"Unsupported prepared asset format: {asset_format}")
+
+    ply = PlyData.read(path)
+    vertex = np.array(ply["vertex"].data, copy=False)
+    point_cloud_vertex = build_point_cloud_from_gaussian_vertex(vertex)
+    xyz = np.stack([point_cloud_vertex["x"], point_cloud_vertex["y"], point_cloud_vertex["z"]], axis=1)
+    rgb = np.stack(
+        [point_cloud_vertex["red"], point_cloud_vertex["green"], point_cloud_vertex["blue"]],
+        axis=1,
+    ).astype(np.float32) / 255.0
+    normals = np.zeros_like(xyz)
+    return dataset_readers.BasicPointCloud(points=xyz, colors=rgb, normals=normals)
+
+
+def merge_point_clouds(base_pcd, prior_pcd):
+    xyz = np.concatenate([np.asarray(base_pcd.points), np.asarray(prior_pcd.points)], axis=0)
+    colors = np.concatenate([np.asarray(base_pcd.colors), np.asarray(prior_pcd.colors)], axis=0)
+    normals = np.concatenate([np.asarray(base_pcd.normals), np.asarray(prior_pcd.normals)], axis=0)
+    return dataset_readers.BasicPointCloud(points=xyz, colors=colors, normals=normals)
+
+
+def _stable_seed(prepared_item: dict[str, Any]) -> int:
+    payload = "::".join(
+        [
+            str(prepared_item.get("target_object_id", "")),
+            str(prepared_item.get("prior_object_id", "")),
+            str(prepared_item.get("aligned_prior", "")),
+        ]
+    )
+    return int(zlib.crc32(payload.encode("utf-8")) & 0xFFFFFFFF)
+
+
+def subsample_point_cloud(point_cloud, *, keep_ratio: float, seed: int):
+    xyz = np.asarray(point_cloud.points)
+    colors = np.asarray(point_cloud.colors)
+    normals = np.asarray(point_cloud.normals)
+    original_count = int(xyz.shape[0])
+    if original_count == 0:
+        return point_cloud, 0, 0
+
+    clipped_ratio = float(np.clip(keep_ratio, 0.0, 1.0))
+    keep_count = min(original_count, max(1, int(round(original_count * clipped_ratio))))
+    if keep_count >= original_count:
+        return point_cloud, original_count, original_count
+
+    rng = np.random.default_rng(seed)
+    indices = np.sort(rng.choice(original_count, size=keep_count, replace=False))
+    sampled = dataset_readers.BasicPointCloud(
+        points=xyz[indices],
+        colors=colors[indices],
+        normals=normals[indices],
+    )
+    return sampled, original_count, keep_count
+
+
+def apply_insertion_policy(prior_pcd, prepared_item: dict[str, Any], *, init_mode: str):
+    updated = dict(prepared_item)
+    raw_score = updated.get("prior_score")
+    normalized_confidence = float(updated.get("normalized_confidence", 1.0) or 0.0)
+    requested_keep_ratio = float(updated.get("point_keep_ratio", 1.0) or 0.0)
+    dropped = bool(updated.get("dropped", False))
+    original_count = int(np.asarray(prior_pcd.points).shape[0])
+
+    updated["prior_score"] = float(raw_score) if raw_score is not None else None
+    updated["normalized_confidence"] = normalized_confidence
+    updated["requested_point_keep_ratio"] = requested_keep_ratio
+    updated["original_point_count"] = original_count
+
+    if dropped:
+        updated["applied_point_keep_ratio"] = 0.0
+        updated["kept_point_count"] = 0
+        updated["dropped"] = True
+        return None, updated
+
+    if init_mode == "weighted_merge":
+        sampled_pcd, original_count, kept_count = subsample_point_cloud(
+            prior_pcd,
+            keep_ratio=requested_keep_ratio,
+            seed=_stable_seed(updated),
+        )
+        updated["applied_point_keep_ratio"] = float(kept_count / max(original_count, 1))
+        updated["kept_point_count"] = kept_count
+        updated["dropped"] = False
+        return sampled_pcd, updated
+
+    updated["applied_point_keep_ratio"] = 1.0
+    updated["kept_point_count"] = original_count
+    updated["dropped"] = False
+    return prior_pcd, updated
+
+
 def initialize_loaded_prior(gaussians, train_cam_infos, cameras_extent: float) -> None:
     gaussians.spatial_lr_scale = cameras_extent
     gaussians.max_radii2D = torch.zeros((gaussians.get_xyz.shape[0]), device="cuda")
@@ -257,24 +454,130 @@ def initialize_loaded_prior(gaussians, train_cam_infos, cameras_extent: float) -
 def write_prior_metadata(
     model_path: Path,
     *,
-    source_prior: Path,
-    aligned_prior: Path,
-    asset_format: str,
-    alignment: dict[str, Any],
-    prior_object_id: str | None,
-    prior_score: float | None,
+    selected_priors: list[dict[str, Any]],
+    init_mode: str,
 ) -> None:
     metadata = {
-        "source_prior": str(source_prior),
-        "aligned_prior": str(aligned_prior),
-        "asset_format": asset_format,
-        "alignment": alignment,
-        "prior_object_id": prior_object_id,
-        "prior_score": prior_score,
+        "selected_priors": selected_priors,
+        "init_mode": init_mode,
     }
+    if len(selected_priors) == 1:
+        item = selected_priors[0]
+        metadata["source_prior"] = item.get("source_prior")
+        metadata["aligned_prior"] = item.get("aligned_prior")
+        metadata["asset_format"] = item.get("asset_format")
+        metadata["alignment"] = item.get("alignment")
+        metadata["prior_object_id"] = item.get("prior_object_id")
+        metadata["prior_score"] = item.get("prior_score")
     metadata_path = model_path / "prior_init" / "metadata.json"
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+
+def render_snapshot_set(
+    *,
+    model_path: Path,
+    name: str,
+    views,
+    gaussians,
+    pipeline,
+    background: torch.Tensor,
+    train_test_exp: bool,
+    separate_sh: bool,
+) -> None:
+    render_path = model_path / name / "ours_0" / "renders"
+    gt_path = model_path / name / "ours_0" / "gt"
+    render_path.mkdir(parents=True, exist_ok=True)
+    gt_path.mkdir(parents=True, exist_ok=True)
+
+    for index, view in enumerate(views):
+        rendering = gaussian_renderer_module.render(
+            view,
+            gaussians,
+            pipeline,
+            background,
+            use_trained_exp=train_test_exp,
+            separate_sh=separate_sh,
+        )["render"]
+        gt = view.original_image[0:3, :, :]
+
+        if train_test_exp:
+            rendering = rendering[..., rendering.shape[-1] // 2 :]
+            gt = gt[..., gt.shape[-1] // 2 :]
+
+        torchvision.utils.save_image(rendering, render_path / f"{index:05d}.png")
+        torchvision.utils.save_image(gt, gt_path / f"{index:05d}.png")
+
+
+def save_initial_snapshot(scene, args) -> None:
+    if not bool(getattr(args, "save_initial_snapshot", False)):
+        return
+    if scene.loaded_iter:
+        return
+
+    model_path = Path(scene.model_path)
+    scene.save(0)
+
+    pipeline = types.SimpleNamespace(
+        convert_SHs_python=bool(getattr(args, "initial_snapshot_convert_shs_python", False)),
+        compute_cov3D_python=bool(getattr(args, "initial_snapshot_compute_cov3d_python", False)),
+        debug=bool(getattr(args, "initial_snapshot_debug", False)),
+        antialiasing=bool(getattr(args, "initial_snapshot_antialiasing", False)),
+    )
+
+    bg_color = [1, 1, 1] if args.white_background else [0, 0, 0]
+    background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
+    requested_sets = tuple(getattr(args, "initial_render_sets", ("train", "test")))
+    separate_sh = bool(getattr(train_module, "SPARSE_ADAM_AVAILABLE", False))
+
+    if "train" in requested_sets:
+        render_snapshot_set(
+            model_path=model_path,
+            name="train",
+            views=scene.getTrainCameras(),
+            gaussians=scene.gaussians,
+            pipeline=pipeline,
+            background=background,
+            train_test_exp=args.train_test_exp,
+            separate_sh=separate_sh,
+        )
+    if "test" in requested_sets:
+        render_snapshot_set(
+            model_path=model_path,
+            name="test",
+            views=scene.getTestCameras(),
+            gaussians=scene.gaussians,
+            pipeline=pipeline,
+            background=background,
+            train_test_exp=args.train_test_exp,
+            separate_sh=separate_sh,
+        )
+
+
+def propagate_prior_runtime_args(dataset: Any, args: argparse.Namespace) -> None:
+    setattr(dataset, "init_mode", args.init_mode)
+    setattr(dataset, "save_initial_snapshot", bool(getattr(args, "save_initial_snapshot", False)))
+    setattr(dataset, "initial_render_sets", tuple(getattr(args, "initial_render_sets", ("train", "test"))))
+    setattr(
+        dataset,
+        "initial_snapshot_convert_shs_python",
+        bool(getattr(args, "initial_snapshot_convert_shs_python", False)),
+    )
+    setattr(
+        dataset,
+        "initial_snapshot_compute_cov3d_python",
+        bool(getattr(args, "initial_snapshot_compute_cov3d_python", False)),
+    )
+    setattr(dataset, "initial_snapshot_debug", bool(getattr(args, "initial_snapshot_debug", False)))
+    setattr(dataset, "initial_snapshot_antialiasing", bool(getattr(args, "initial_snapshot_antialiasing", False)))
+    if getattr(args, "prepared_init_ply", None) is not None:
+        setattr(dataset, "prepared_init_ply", str(args.prepared_init_ply))
+        setattr(dataset, "prepared_init_format", args.prepared_init_format)
+    if getattr(args, "prepared_init_plys", None):
+        setattr(dataset, "prepared_init_plys", list(getattr(args, "prepared_init_plys")))
+        setattr(dataset, "prepared_init_formats", list(getattr(args, "prepared_init_formats")))
+    if getattr(args, "selected_priors_metadata", None):
+        setattr(dataset, "selected_priors_metadata", list(getattr(args, "selected_priors_metadata")))
 
 
 def make_prior_init_scene():
@@ -296,14 +599,25 @@ def make_prior_init_scene():
             self.train_cameras = {}
             self.test_cameras = {}
 
+            test_list_path = os.path.join(args.source_path, "sparse/0", "test.txt")
             if os.path.exists(os.path.join(args.source_path, "sparse")):
-                scene_info = scene_module.sceneLoadTypeCallbacks["Colmap"](
-                    args.source_path,
-                    args.images,
-                    args.depths,
-                    args.eval,
-                    args.train_test_exp,
-                )
+                if os.path.exists(test_list_path):
+                    scene_info = dataset_readers.readColmapSceneInfo(
+                        args.source_path,
+                        args.images,
+                        args.depths,
+                        True,
+                        args.train_test_exp,
+                        llffhold=0,
+                    )
+                else:
+                    scene_info = scene_module.sceneLoadTypeCallbacks["Colmap"](
+                        args.source_path,
+                        args.images,
+                        args.depths,
+                        args.eval,
+                        args.train_test_exp,
+                    )
             elif os.path.exists(os.path.join(args.source_path, "transforms_train.json")):
                 print("Found transforms_train.json file, assuming Blender data set!")
                 scene_info = scene_module.sceneLoadTypeCallbacks["Blender"](
@@ -337,8 +651,24 @@ def make_prior_init_scene():
                     f"seed={getattr(args, 'camera_selection_seed', 42)})"
                 )
 
+            prepared_init_plys = list(getattr(args, "prepared_init_plys", []))
+            prepared_init_formats = list(getattr(args, "prepared_init_formats", []))
+            selected_priors_metadata = [dict(item) for item in getattr(args, "selected_priors_metadata", [])]
+            prepared_init_ply = getattr(args, "prepared_init_ply", None)
+            prepared_asset_format = getattr(args, "prepared_init_format", None)
+            if not prepared_init_plys and prepared_init_ply is not None:
+                prepared_init_plys = [str(prepared_init_ply)]
+                if prepared_asset_format is None:
+                    raise ValueError("prepared_init_format is required when prepared_init_ply is set")
+                prepared_init_formats = [str(prepared_asset_format)]
+
             if not self.loaded_iter:
-                input_ply = Path(getattr(args, "prepared_init_ply", scene_info.ply_path))
+                if prepared_init_plys and getattr(args, "init_mode", "merge") == "replace":
+                    if len(prepared_init_plys) != 1:
+                        raise ValueError("replace init_mode supports exactly one prepared prior")
+                    input_ply = Path(prepared_init_plys[0])
+                else:
+                    input_ply = Path(scene_info.ply_path)
                 input_ply = input_ply.resolve()
                 Path(self.model_path).mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(input_ply, Path(self.model_path) / "input.ply")
@@ -379,9 +709,6 @@ def make_prior_init_scene():
                     True,
                 )
 
-            prepared_init_ply = getattr(args, "prepared_init_ply", None)
-            prepared_asset_format = getattr(args, "prepared_init_format", None)
-
             if self.loaded_iter:
                 self.gaussians.load_ply(
                     os.path.join(
@@ -392,18 +719,57 @@ def make_prior_init_scene():
                     ),
                     args.train_test_exp,
                 )
-            elif prepared_init_ply is not None:
-                init_path = Path(prepared_init_ply)
-                if prepared_asset_format == "gaussian":
-                    self.gaussians.load_ply(str(init_path), args.train_test_exp)
-                    initialize_loaded_prior(self.gaussians, train_cam_infos, self.cameras_extent)
-                elif prepared_asset_format == "point_cloud":
-                    pcd = dataset_readers.fetchPly(str(init_path))
-                    self.gaussians.create_from_pcd(pcd, train_cam_infos, self.cameras_extent)
+            elif prepared_init_plys:
+                init_mode = getattr(args, "init_mode", "merge")
+                if init_mode == "replace":
+                    if len(prepared_init_plys) != 1:
+                        raise ValueError("replace init_mode supports exactly one prepared prior")
+                    init_path = Path(prepared_init_plys[0])
+                    prepared_asset_format = prepared_init_formats[0]
+                    if prepared_asset_format == "gaussian":
+                        self.gaussians.load_ply(str(init_path), args.train_test_exp)
+                        initialize_loaded_prior(self.gaussians, train_cam_infos, self.cameras_extent)
+                    elif prepared_asset_format == "point_cloud":
+                        pcd = dataset_readers.fetchPly(str(init_path))
+                        self.gaussians.create_from_pcd(pcd, train_cam_infos, self.cameras_extent)
+                    else:
+                        raise ValueError(f"Unsupported prepared asset format: {prepared_asset_format}")
+                elif init_mode in {"merge", "weighted_merge", "filtered_merge"}:
+                    merged_pcd = scene_info.point_cloud
+                    updated_selected_priors: list[dict[str, Any]] = []
+                    for init_path_value, init_format in zip(prepared_init_plys, prepared_init_formats):
+                        index = len(updated_selected_priors)
+                        prior_pcd = prepared_asset_to_point_cloud(Path(init_path_value), init_format)
+                        metadata_item = (
+                            dict(selected_priors_metadata[index])
+                            if index < len(selected_priors_metadata)
+                            else {
+                                "aligned_prior": str(init_path_value),
+                                "asset_format": init_format,
+                            }
+                        )
+                        filtered_pcd, updated_item = apply_insertion_policy(
+                            prior_pcd,
+                            metadata_item,
+                            init_mode=init_mode,
+                        )
+                        updated_selected_priors.append(updated_item)
+                        if filtered_pcd is None:
+                            continue
+                        merged_pcd = merge_point_clouds(merged_pcd, filtered_pcd)
+                    self.gaussians.create_from_pcd(merged_pcd, train_cam_infos, self.cameras_extent)
+                    if updated_selected_priors:
+                        write_prior_metadata(
+                            Path(self.model_path),
+                            selected_priors=updated_selected_priors,
+                            init_mode=init_mode,
+                        )
                 else:
-                    raise ValueError(f"Unsupported prepared asset format: {prepared_asset_format}")
+                    raise ValueError(f"Unsupported init_mode: {init_mode}")
             else:
                 self.gaussians.create_from_pcd(scene_info.point_cloud, train_cam_infos, self.cameras_extent)
+
+            save_initial_snapshot(self, args)
 
         def save(self, iteration):
             point_cloud_path = os.path.join(self.model_path, "point_cloud/iteration_{}".format(iteration))
@@ -424,6 +790,35 @@ def make_prior_init_scene():
     return PriorInitScene
 
 
+def write_render_compatible_cfg_args(model_path: Path, args: argparse.Namespace) -> None:
+    allowed_keys = (
+        "sh_degree",
+        "source_path",
+        "model_path",
+        "images",
+        "depths",
+        "resolution",
+        "white_background",
+        "train_test_exp",
+        "data_device",
+        "max_train_cameras",
+        "camera_quality_ratio",
+        "camera_selection_seed",
+        "eval",
+        "convert_SHs_python",
+        "compute_cov3D_python",
+        "debug",
+        "antialiasing",
+    )
+    payload = {
+        key: getattr(args, key)
+        for key in allowed_keys
+        if hasattr(args, key)
+    }
+    cfg_args_path = model_path / "cfg_args"
+    cfg_args_path.write_text(repr(argparse.Namespace(**payload)), encoding="utf-8")
+
+
 def build_parser() -> tuple[argparse.ArgumentParser, Any, Any, Any]:
     parser = argparse.ArgumentParser(description="Train vanilla 3DGS with optional prior initialization.")
     parser.add_argument("--repo-path", required=True, type=Path)
@@ -438,12 +833,26 @@ def build_parser() -> tuple[argparse.ArgumentParser, Any, Any, Any]:
     parser.add_argument("--save_iterations", nargs="+", type=int, default=[7_000, 30_000])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--disable_viewer", action="store_true", default=False)
+    parser.add_argument("--save-initial-snapshot", action="store_true", default=False)
+    parser.add_argument(
+        "--initial-render-sets",
+        nargs="+",
+        choices=["train", "test"],
+        default=("train", "test"),
+    )
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default=None)
     parser.add_argument("--prior-ply", type=Path)
     parser.add_argument("--alignment-json", type=Path)
     parser.add_argument("--prior-object-id", type=str)
     parser.add_argument("--prior-score", type=float)
+    parser.add_argument("--prior-spec-json", type=Path)
+    parser.add_argument(
+        "--init-mode",
+        type=str,
+        default="merge",
+        choices=["merge", "replace", "weighted_merge", "filtered_merge"],
+    )
     return parser, lp, op, pp
 
 
@@ -454,7 +863,23 @@ def main() -> int:
 
     prepared_init_ply = None
     prepared_asset_format = None
-    if args.prior_ply is not None:
+    if args.prior_ply is not None and args.prior_spec_json is not None:
+        raise ValueError("--prior-ply and --prior-spec-json are mutually exclusive")
+
+    if args.prior_spec_json is not None:
+        args.prior_spec_json = args.prior_spec_json.resolve()
+        model_path = Path(args.model_path).resolve()
+        prior_specs = load_prior_specs(args.prior_spec_json)
+        prepared = prepare_prior_assets(prior_specs, model_path)
+        args.prepared_init_plys = [item["aligned_prior"] for item in prepared]
+        args.prepared_init_formats = [item["asset_format"] for item in prepared]
+        args.selected_priors_metadata = prepared
+        write_prior_metadata(
+            model_path,
+            selected_priors=prepared,
+            init_mode=args.init_mode,
+        )
+    elif args.prior_ply is not None:
         args.prior_ply = args.prior_ply.resolve()
         if args.alignment_json is not None:
             args.alignment_json = args.alignment_json.resolve()
@@ -466,14 +891,23 @@ def main() -> int:
         )
         args.prepared_init_ply = str(prepared_init_ply)
         args.prepared_init_format = prepared_asset_format
+        args.selected_priors_metadata = [
+            {
+                "source_prior": str(args.prior_ply),
+                "aligned_prior": str(prepared_init_ply),
+                "asset_format": prepared_asset_format,
+                "alignment": alignment,
+                "prior_object_id": args.prior_object_id,
+                "prior_score": args.prior_score,
+                "normalized_confidence": 1.0,
+                "point_keep_ratio": 1.0,
+                "dropped": False,
+            }
+        ]
         write_prior_metadata(
             model_path,
-            source_prior=args.prior_ply,
-            aligned_prior=prepared_init_ply,
-            asset_format=prepared_asset_format,
-            alignment=alignment,
-            prior_object_id=args.prior_object_id,
-            prior_score=args.prior_score,
+            selected_priors=list(args.selected_priors_metadata),
+            init_mode=args.init_mode,
         )
 
     args.save_iterations.append(args.iterations)
@@ -481,10 +915,15 @@ def main() -> int:
     dataset = lp.extract(args)
     opt = op.extract(args)
     pipe = pp.extract(args)
+    args.initial_snapshot_convert_shs_python = pipe.convert_SHs_python
+    args.initial_snapshot_compute_cov3d_python = pipe.compute_cov3D_python
+    args.initial_snapshot_debug = pipe.debug
+    args.initial_snapshot_antialiasing = pipe.antialiasing
 
     if prepared_init_ply is not None:
-        setattr(dataset, "prepared_init_ply", str(prepared_init_ply))
-        setattr(dataset, "prepared_init_format", prepared_asset_format)
+        args.prepared_init_ply = str(prepared_init_ply)
+        args.prepared_init_format = prepared_asset_format
+    propagate_prior_runtime_args(dataset, args)
 
     scene_class = make_prior_init_scene()
     train_module.Scene = scene_class
@@ -501,6 +940,7 @@ def main() -> int:
         args.start_checkpoint,
         args.debug_from,
     )
+    write_render_compatible_cfg_args(Path(args.model_path).resolve(), args)
     print("\nTraining complete.")
     return 0
 

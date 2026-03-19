@@ -1,0 +1,14 @@
+{
+  "dataset": "replica",
+  "raw_scene_id": "room_0",
+  "subset_id": "room_0",
+  "export_type": "colmap_text_gt",
+  "frame_count": 96,
+  "notes": [
+    "Rendered from Replica GT mesh using the configured Replica renderer backend.",
+    "Camera poses and sparse points are generated from ground truth, not COLMAP estimation."
+  ],
+  "render_backend": "semantic_point_renderer",
+  "oracle_target_path": "oracle/target.json",
+  "oracle_query_feature_path": "oracle/query_feature.npy"
+}

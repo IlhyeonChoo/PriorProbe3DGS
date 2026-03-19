@@ -1,0 +1,28 @@
+[
+  {
+    "scene_id": "room_0",
+    "baseline_time_sec": 118.71758099179715,
+    "baseline_psnr_3000": 12.56894588470459,
+    "baseline_psnr_7000": 13.064375877380371,
+    "oracle_time_sec": 121.31136879697442,
+    "oracle_psnr_3000": 12.575852394104004,
+    "oracle_psnr_7000": 13.09111499786377,
+    "oracle_time_to_baseline_3000_sec": 51.990587,
+    "oracle_prior_object_id": "chair_0201",
+    "oracle_prior_category": "chair",
+    "oracle_retrieval_score": 0.998605489730835
+  },
+  {
+    "scene_id": "office_0",
+    "baseline_time_sec": 133.9288343382068,
+    "baseline_psnr_3000": 12.281478881835938,
+    "baseline_psnr_7000": 12.623485565185547,
+    "oracle_time_sec": 136.4332981808111,
+    "oracle_psnr_3000": 12.304112434387207,
+    "oracle_psnr_7000": 12.65433120727539,
+    "oracle_time_to_baseline_3000_sec": 58.471414,
+    "oracle_prior_object_id": "chair_0240",
+    "oracle_prior_category": "chair",
+    "oracle_retrieval_score": 0.9918091893196106
+  }
+]

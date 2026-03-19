@@ -17,15 +17,60 @@ venv/
 .mypy_cache/
 .ipynb_checkpoints/
 
+# ML / research intermediates
+*.pt
+*.pth
+*.ckpt
+*.npy
+*.npz
+*.pkl
+*.safetensors
+*.onnx
+
+# Archives / partial downloads
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.part*
+*.corrupt
+
 # Data and artifacts
 data/*
 !data/README.md
-!data/**/
 data/**/*
+!data/**/
 !data/**/.gitkeep
 !data/**/README.md
 !data/**/scene_meta.json
 outputs/*
 !outputs/.gitkeep
+!outputs/experiments/
+outputs/experiments/**/*
+!outputs/experiments/**/
+!outputs/experiments/**/backend_run.json
+!outputs/experiments/**/evaluation.json
+!outputs/experiments/**/run_summary.json
+!outputs/backend_runs/
+outputs/backend_runs/**/*
+!outputs/backend_runs/**/
+# Keep lightweight backend metadata and qualitative summaries only.
+!outputs/backend_runs/**/*.json
+!outputs/backend_runs/**/cfg_args
+!outputs/backend_runs/**/inspection/**/*.html
+!outputs/backend_runs/**/inspection/**/*.png
+!outputs/backend_runs/**/prior_init/aligned_prior*.ply
+outputs/backend_runs/**/._*
+!outputs/prior_library/
+outputs/prior_library/**/*
+!outputs/prior_library/**/
+!outputs/prior_library/**/*.json
+!outputs/reports/
+outputs/reports/**/*
+!outputs/reports/**/
+!outputs/reports/**/*.json
+!outputs/reports/**/*.csv
+!outputs/reports/**/*.md
 logs/*
 !logs/.gitkeep

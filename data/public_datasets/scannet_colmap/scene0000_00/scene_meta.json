@@ -1,0 +1,10 @@
+{
+  "dataset": "scannet",
+  "raw_scene_id": "scene0000_00",
+  "subset_id": "scene0000_00",
+  "export_type": "colmap",
+  "frame_count": 0,
+  "notes": [
+    "Replace this scaffold metadata with the actual subset export information before training."
+  ]
+}

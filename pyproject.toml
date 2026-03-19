@@ -9,6 +9,9 @@ description = "Scaffold for controlled prior-reuse experiments in 3D Gaussian Sp
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
+    "numpy>=1.26,<3",
+    "Pillow>=10,<13",
+    "plyfile>=1.1,<2",
     "PyYAML>=6.0",
     "torch==2.7.1",
     "torchvision==0.22.1",
@@ -17,6 +20,10 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=8.0,<9",
+]
+experiments = [
+    "numpy-quaternion>=2024.0.12",
+    "open-clip-torch>=2.26.1",
 ]
 
 [tool.setuptools]

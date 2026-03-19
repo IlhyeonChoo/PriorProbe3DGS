@@ -4,10 +4,10 @@ experiment:
   reconstruction_backend: vanilla_3dgs
   dataset_config: configs/datasets/replica.yaml
   prior_config: configs/priors/shapesplat.yaml
-  retrieval_mode: oracle
+  retrieval_mode: oracle_category
   alignment_mode: oracle_manual
   adaptation: none
-  prior_object_id: chair_basic
+  prior_object_id: null
 
 backend:
   repo_path: ../3DGS/gaussian-splatting
@@ -17,13 +17,13 @@ backend:
   disable_viewer: true
   quiet: true
   dry_run: false
+  init_mode: merge
 
-prior_alignment:
-  transform_path: configs/alignments/identity.json
+prior_alignment: {}
 
 trainer:
-  iterations: 1000
+  iterations: 7000
   sh_degree: 3
-  test_iterations: [1000]
-  save_iterations: [1000]
+  test_iterations: [500, 1000, 2000, 3000, 5000, 7000]
+  save_iterations: [500, 1000, 2000, 3000, 5000, 7000]
   checkpoint_iterations: []

@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
+import numpy as np
+
+from priorprobe.features import cosine_similarity
 from priorprobe.prior_library.library import PriorLibrary
 
 
@@ -16,10 +19,20 @@ class RetrievalResult:
     mode: str
     gaussian_path: Path
     category: str
+    candidate_count: int
+    fallback_used: bool
+    feature_path: Path | None = None
+
+
+def _load_feature(path: Path | None) -> np.ndarray | None:
+    if path is None or not path.exists():
+        return None
+    payload = np.load(path)
+    return payload.reshape(-1).astype(np.float32)
 
 
 class PriorRetriever:
-    """Placeholder retriever with oracle and deterministic fallback modes."""
+    """Category-aware top-k retriever for ShapeSplat prior assets."""
 
     def __init__(self, library: PriorLibrary) -> None:
         self._library = library
@@ -29,30 +42,46 @@ class PriorRetriever:
         query_features: Sequence[float] | None = None,
         *,
         top_k: int = 1,
-        oracle_object_id: str | None = None,
+        oracle_category: str | None = None,
+        fallback_to_all: bool = True,
     ) -> list[RetrievalResult]:
-        del query_features
-        if oracle_object_id is not None:
-            entry = self._library.get(oracle_object_id)
-            return [
-                RetrievalResult(
-                    object_id=oracle_object_id,
-                    score=1.0,
-                    mode="oracle",
-                    gaussian_path=entry.gaussian_path,
-                    category=entry.category,
-                )
-            ]
+        query_vector = (
+            np.asarray(query_features, dtype=np.float32).reshape(-1)
+            if query_features is not None
+            else None
+        )
 
-        entries = self._library.list_entries()
+        candidates = (
+            self._library.find_by_category(oracle_category)
+            if oracle_category is not None
+            else self._library.list_entries()
+        )
+        fallback_used = False
+        if not candidates and fallback_to_all:
+            candidates = self._library.list_entries()
+            fallback_used = True
+
+        scored: list[tuple[float, object]] = []
+        for index, entry in enumerate(candidates):
+            score = 1.0 / (index + 1)
+            feature = _load_feature(entry.feature_path)
+            if query_vector is not None and feature is not None:
+                score = cosine_similarity(query_vector, feature)
+            scored.append((score, entry))
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        mode = "oracle_category" if oracle_category is not None else "automatic"
         results = [
             RetrievalResult(
                 object_id=entry.object_id,
-                score=1.0 / (index + 1),
-                mode="automatic",
+                score=float(score),
+                mode=mode,
                 gaussian_path=entry.gaussian_path,
                 category=entry.category,
+                candidate_count=len(candidates),
+                fallback_used=fallback_used,
+                feature_path=entry.feature_path,
             )
-            for index, entry in enumerate(entries[:top_k])
+            for score, entry in scored[:top_k]
         ]
         return results

@@ -1,0 +1,26 @@
+experiment:
+  name: baseline_smoke_vanilla_3dgs
+  initialization: from_scratch
+  reconstruction_backend: vanilla_3dgs
+  dataset_config: configs/datasets/replica.yaml
+  prior_config: null
+  retrieval_mode: none
+  alignment_mode: none
+  adaptation: none
+  prior_object_id: null
+
+backend:
+  repo_path: ../3DGS/gaussian-splatting
+  python_executable: ../3DGS/gaussian-splatting/venv/bin/python
+  source_path: /path/to/colmap_scene
+  model_path: CHANGE_ME_DATASET_OUTPUT
+  disable_viewer: true
+  quiet: true
+  dry_run: false
+
+trainer:
+  iterations: 1
+  sh_degree: 3
+  test_iterations: [1]
+  save_iterations: [1]
+  checkpoint_iterations: []

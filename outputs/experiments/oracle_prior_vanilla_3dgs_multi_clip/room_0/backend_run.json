@@ -1,0 +1,578 @@
+{
+  "experiment_name": "oracle_prior_vanilla_3dgs_multi_clip",
+  "backend": "vanilla_3dgs",
+  "initialization": "prior",
+  "status": "completed",
+  "repo_path": "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting",
+  "source_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0",
+  "model_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0",
+  "dataset_scene": {
+    "dataset_name": "replica",
+    "scene_id": "room_0",
+    "format": "colmap",
+    "source_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0",
+    "images": "images",
+    "depths": "",
+    "eval": true,
+    "white_background": false,
+    "notes": [
+      "Replica multi-object oracle exports are staged on SSD for actual training runs.",
+      "Scene subsets are rendered with scene-centric camera paths for top-K supported objects."
+    ]
+  },
+  "command": [
+    "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python",
+    "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/scripts/train_vanilla_3dgs_backend.py",
+    "--repo-path",
+    "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting",
+    "--source_path",
+    "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0",
+    "--model_path",
+    "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0",
+    "--images",
+    "images",
+    "--sh_degree",
+    "3",
+    "--iterations",
+    "7000",
+    "--test_iterations",
+    "500",
+    "1000",
+    "2000",
+    "3000",
+    "5000",
+    "7000",
+    "--save_iterations",
+    "500",
+    "1000",
+    "2000",
+    "3000",
+    "5000",
+    "7000",
+    "--disable_viewer",
+    "--eval",
+    "--quiet",
+    "--prior-object-id",
+    "lamp_0085",
+    "--prior-score",
+    "0.7352321743965149",
+    "--prior-spec-json",
+    "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/prior_specs.json"
+  ],
+  "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/scripts/train_vanilla_3dgs_backend.py --repo-path /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting --source_path /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0 --model_path /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0 --images images --sh_degree 3 --iterations 7000 --test_iterations 500 1000 2000 3000 5000 7000 --save_iterations 500 1000 2000 3000 5000 7000 --disable_viewer --eval --quiet --prior-object-id lamp_0085 --prior-score 0.7352321743965149 --prior-spec-json /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/prior_specs.json",
+  "alignment_json": null,
+  "prior_spec_json": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/prior_specs.json",
+  "generated_alignment": null,
+  "generated_alignments": [
+    {
+      "scale": 1.7007390260696411,
+      "rotation_matrix": [
+        [
+          0.03861180320382118,
+          -0.9992476105690002,
+          -0.0036468247417360544
+        ],
+        [
+          0.9992493391036987,
+          0.03862284868955612,
+          -0.0030083837918937206
+        ],
+        [
+          0.003146971110254526,
+          -0.0035279279109090567,
+          0.999988853931427
+        ]
+      ],
+      "translation": [
+        -0.455865740776062,
+        -3.3729677200317383,
+        -0.8235347270965576
+      ],
+      "metadata": {
+        "target_category": "lamp",
+        "target_object_id": 6,
+        "target_sizes": [
+          0.9043786525726318,
+          2.5480339527130127,
+          1.3938593864440918
+        ],
+        "prior_scale_meters": [
+          0.5317562818527222,
+          0.5074371695518494,
+          1.1212133169174194
+        ]
+      }
+    },
+    {
+      "scale": 2.317225456237793,
+      "rotation_matrix": [
+        [
+          0.9949318170547485,
+          -0.1004859134554863,
+          -0.0036468245089054108
+        ],
+        [
+          0.10047520697116852,
+          0.9949350357055664,
+          -0.0030083837918937206
+        ],
+        [
+          0.003930653445422649,
+          0.0026267212815582752,
+          0.999988853931427
+        ]
+      ],
+      "translation": [
+        3.6246674060821533,
+        -0.8960235118865967,
+        -1.0596339702606201
+      ],
+      "metadata": {
+        "target_category": "sofa",
+        "target_object_id": 9,
+        "target_sizes": [
+          2.403555393218994,
+          1.3626773357391357,
+          0.9077222347259521
+        ],
+        "prior_scale_meters": [
+          1.035003423690796,
+          1.0490684509277344,
+          0.3917280435562134
+        ]
+      }
+    },
+    {
+      "scale": 2.529634714126587,
+      "rotation_matrix": [
+        [
+          0.9995654821395874,
+          -0.02924969047307968,
+          -0.003646824276074767
+        ],
+        [
+          0.029238786548376083,
+          0.9995679259300232,
+          -0.0030083833262324333
+        ],
+        [
+          0.0037332428619265556,
+          0.0029004474636167288,
+          0.999988853931427
+        ]
+      ],
+      "translation": [
+        3.8245434761047363,
+        2.529953956604004,
+        -1.0665242671966553
+      ],
+      "metadata": {
+        "target_category": "sofa",
+        "target_object_id": 77,
+        "target_sizes": [
+          2.3425323963165283,
+          1.1306549310684204,
+          0.9139622449874878
+        ],
+        "prior_scale_meters": [
+          1.0038890838623047,
+          0.3772526979446411,
+          0.36130207777023315
+        ]
+      }
+    },
+    {
+      "scale": 1.093880295753479,
+      "rotation_matrix": [
+        [
+          0.9991415739059448,
+          -0.04126449301838875,
+          -0.003646824276074767
+        ],
+        [
+          0.04125361889600754,
+          0.9991441965103149,
+          -0.003008383559063077
+        ],
+        [
+          0.003767842659726739,
+          0.0028553565498441458,
+          0.999988853931427
+        ]
+      ],
+      "translation": [
+        5.709177494049072,
+        0.2725111246109009,
+        -0.9655821323394775
+      ],
+      "metadata": {
+        "target_category": "chair",
+        "target_object_id": 74,
+        "target_sizes": [
+          0.8969669342041016,
+          0.8423287868499756,
+          1.0819392204284668
+        ],
+        "prior_scale_meters": [
+          0.8019311428070068,
+          0.7700374722480774,
+          1.0028276443481445
+        ]
+      }
+    }
+  ],
+  "selected_prior": {
+    "object_id": "lamp_0085",
+    "score": 0.7352321743965149,
+    "mode": "oracle_category",
+    "gaussian_path": "None",
+    "category": "lamp",
+    "feature_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/modelnet_bundle_clip/features/lamp/lamp_0085.npy",
+    "candidate_count": 123,
+    "fallback_used": false
+  },
+  "selected_priors": [
+    {
+      "object_id": "lamp_0085",
+      "score": 0.7352321743965149,
+      "mode": "oracle_category",
+      "gaussian_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/modelnet_bundle_clip/assets/lamp/lamp_0085/splat.ply",
+      "category": "lamp",
+      "feature_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/modelnet_bundle_clip/features/lamp/lamp_0085.npy",
+      "candidate_count": 123,
+      "fallback_used": false,
+      "target_object_id": 6,
+      "target_category": "lamp"
+    },
+    {
+      "object_id": "sofa_0131",
+      "score": 0.7350780367851257,
+      "mode": "oracle_category",
+      "gaussian_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/modelnet_bundle_clip/assets/sofa/sofa_0131/splat.ply",
+      "category": "sofa",
+      "feature_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/modelnet_bundle_clip/features/sofa/sofa_0131.npy",
+      "candidate_count": 256,
+      "fallback_used": false,
+      "target_object_id": 9,
+      "target_category": "sofa"
+    },
+    {
+      "object_id": "sofa_0195",
+      "score": 0.6666622757911682,
+      "mode": "oracle_category",
+      "gaussian_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/modelnet_bundle_clip/assets/sofa/sofa_0195/splat.ply",
+      "category": "sofa",
+      "feature_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/modelnet_bundle_clip/features/sofa/sofa_0195.npy",
+      "candidate_count": 256,
+      "fallback_used": false,
+      "target_object_id": 77,
+      "target_category": "sofa"
+    },
+    {
+      "object_id": "chair_0016",
+      "score": 0.7506018877029419,
+      "mode": "oracle_category",
+      "gaussian_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/modelnet_bundle_clip/assets/chair/chair_0016/splat.ply",
+      "category": "chair",
+      "feature_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/modelnet_bundle_clip/features/chair/chair_0016.npy",
+      "candidate_count": 256,
+      "fallback_used": false,
+      "target_object_id": 74,
+      "target_category": "chair"
+    }
+  ],
+  "oracle_target": {
+    "scene_id": "room_0",
+    "object_id": 6,
+    "category": "lamp",
+    "center": [
+      -0.455865740776062,
+      -3.3729677200317383,
+      -0.8235347270965576
+    ],
+    "sizes": [
+      0.9043786525726318,
+      2.5480339527130127,
+      1.3938593864440918
+    ],
+    "rotation_xyzw": [
+      -0.00018023990560323,
+      -0.002356898505240679,
+      0.6933170557022095,
+      0.7206287980079651
+    ],
+    "volume": 3.2119922637939453,
+    "crop_dir": "oracle/objects/6/crops",
+    "query_feature_paths": {
+      "clip": "oracle/objects/6/query_feature_clip.npy"
+    },
+    "visible_frame_count": 96
+  },
+  "oracle_targets": [
+    {
+      "scene_id": "room_0",
+      "object_id": 6,
+      "category": "lamp",
+      "center": [
+        -0.455865740776062,
+        -3.3729677200317383,
+        -0.8235347270965576
+      ],
+      "sizes": [
+        0.9043786525726318,
+        2.5480339527130127,
+        1.3938593864440918
+      ],
+      "rotation_xyzw": [
+        -0.00018023990560323,
+        -0.002356898505240679,
+        0.6933170557022095,
+        0.7206287980079651
+      ],
+      "volume": 3.2119922637939453,
+      "crop_dir": "oracle/objects/6/crops",
+      "query_feature_paths": {
+        "clip": "oracle/objects/6/query_feature_clip.npy"
+      },
+      "visible_frame_count": 96
+    },
+    {
+      "scene_id": "room_0",
+      "object_id": 9,
+      "category": "sofa",
+      "center": [
+        3.6246674060821533,
+        -0.8960235118865967,
+        -1.0596339702606201
+      ],
+      "sizes": [
+        2.403555393218994,
+        1.3626773357391357,
+        0.9077222347259521
+      ],
+      "rotation_xyzw": [
+        0.001410566153936088,
+        -0.001896776375360787,
+        0.0503041110932827,
+        0.9987311959266663
+      ],
+      "volume": 2.9730358123779297,
+      "crop_dir": "oracle/objects/9/crops",
+      "query_feature_paths": {
+        "clip": "oracle/objects/9/query_feature_clip.npy"
+      },
+      "visible_frame_count": 96
+    },
+    {
+      "scene_id": "room_0",
+      "object_id": 77,
+      "category": "sofa",
+      "center": [
+        3.8245434761047363,
+        2.529953956604004,
+        -1.0665242671966553
+      ],
+      "sizes": [
+        2.3425323963165283,
+        1.1306549310684204,
+        0.9139622449874878
+      ],
+      "rotation_xyzw": [
+        0.0014773699222132564,
+        -0.0018452194053679705,
+        0.014623724855482578,
+        0.9998903274536133
+      ],
+      "volume": 2.4207165241241455,
+      "crop_dir": "oracle/objects/77/crops",
+      "query_feature_paths": {
+        "clip": "oracle/objects/77/query_feature_clip.npy"
+      },
+      "visible_frame_count": 96
+    },
+    {
+      "scene_id": "room_0",
+      "object_id": 74,
+      "category": "chair",
+      "center": [
+        5.709177494049072,
+        0.2725111246109009,
+        -0.9655821323394775
+      ],
+      "sizes": [
+        0.8969669342041016,
+        0.8423287868499756,
+        1.0819392204284668
+      ],
+      "rotation_xyzw": [
+        0.0014662513276562095,
+        -0.0018540667369961739,
+        0.02063397876918316,
+        0.9997843503952026
+      ],
+      "volume": 0.8174495100975037,
+      "crop_dir": "oracle/objects/74/crops",
+      "query_feature_paths": {
+        "clip": "oracle/objects/74/query_feature_clip.npy"
+      },
+      "visible_frame_count": 96
+    }
+  ],
+  "render_runs": [
+    {
+      "iteration": 500,
+      "command": [
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python",
+        "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py",
+        "--source_path",
+        "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0",
+        "--model_path",
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0",
+        "--images",
+        "images",
+        "--iteration",
+        "500",
+        "--skip_train",
+        "--eval",
+        "--quiet"
+      ],
+      "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py --source_path /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0 --model_path /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0 --images images --iteration 500 --skip_train --eval --quiet",
+      "return_code": 0,
+      "elapsed_sec": 2.6423775968141854,
+      "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/render_500_stdout.log",
+      "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/render_500_stderr.log"
+    },
+    {
+      "iteration": 1000,
+      "command": [
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python",
+        "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py",
+        "--source_path",
+        "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0",
+        "--model_path",
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0",
+        "--images",
+        "images",
+        "--iteration",
+        "1000",
+        "--skip_train",
+        "--eval",
+        "--quiet"
+      ],
+      "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py --source_path /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0 --model_path /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0 --images images --iteration 1000 --skip_train --eval --quiet",
+      "return_code": 0,
+      "elapsed_sec": 2.5825420590117574,
+      "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/render_1000_stdout.log",
+      "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/render_1000_stderr.log"
+    },
+    {
+      "iteration": 2000,
+      "command": [
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python",
+        "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py",
+        "--source_path",
+        "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0",
+        "--model_path",
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0",
+        "--images",
+        "images",
+        "--iteration",
+        "2000",
+        "--skip_train",
+        "--eval",
+        "--quiet"
+      ],
+      "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py --source_path /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0 --model_path /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0 --images images --iteration 2000 --skip_train --eval --quiet",
+      "return_code": 0,
+      "elapsed_sec": 2.752784230746329,
+      "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/render_2000_stdout.log",
+      "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/render_2000_stderr.log"
+    },
+    {
+      "iteration": 3000,
+      "command": [
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python",
+        "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py",
+        "--source_path",
+        "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0",
+        "--model_path",
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0",
+        "--images",
+        "images",
+        "--iteration",
+        "3000",
+        "--skip_train",
+        "--eval",
+        "--quiet"
+      ],
+      "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py --source_path /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0 --model_path /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0 --images images --iteration 3000 --skip_train --eval --quiet",
+      "return_code": 0,
+      "elapsed_sec": 2.8880722131580114,
+      "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/render_3000_stdout.log",
+      "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/render_3000_stderr.log"
+    },
+    {
+      "iteration": 5000,
+      "command": [
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python",
+        "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py",
+        "--source_path",
+        "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0",
+        "--model_path",
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0",
+        "--images",
+        "images",
+        "--iteration",
+        "5000",
+        "--skip_train",
+        "--eval",
+        "--quiet"
+      ],
+      "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py --source_path /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0 --model_path /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0 --images images --iteration 5000 --skip_train --eval --quiet",
+      "return_code": 0,
+      "elapsed_sec": 3.023548147175461,
+      "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/render_5000_stdout.log",
+      "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/render_5000_stderr.log"
+    },
+    {
+      "iteration": 7000,
+      "command": [
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python",
+        "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py",
+        "--source_path",
+        "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0",
+        "--model_path",
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0",
+        "--images",
+        "images",
+        "--iteration",
+        "7000",
+        "--skip_train",
+        "--eval",
+        "--quiet"
+      ],
+      "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py --source_path /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/room_0 --model_path /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0 --images images --iteration 7000 --skip_train --eval --quiet",
+      "return_code": 0,
+      "elapsed_sec": 3.1285477727651596,
+      "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/render_7000_stdout.log",
+      "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/render_7000_stderr.log"
+    }
+  ],
+  "metrics_run": {
+    "command": [
+      "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python",
+      "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/metrics.py",
+      "--model_paths",
+      "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0"
+    ],
+    "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/metrics.py --model_paths /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_clip/room_0",
+    "return_code": 0,
+    "elapsed_sec": 34.88694120803848,
+    "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/metrics_stdout.log",
+    "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/metrics_stderr.log"
+  },
+  "return_code": 0,
+  "elapsed_sec": 148.96205472759902,
+  "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/backend_stdout.log",
+  "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/experiments/oracle_prior_vanilla_3dgs_multi_clip/room_0/backend_stderr.log"
+}

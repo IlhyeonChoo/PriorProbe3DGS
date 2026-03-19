@@ -1,0 +1,25 @@
+asset_prep:
+  feature_backend: open_clip
+  feature_model_name: ViT-B-32
+  feature_pretrained: laion2b_s34b_b79k
+  render_sample_count: 8
+  min_render_count: 8
+  allow_fallback: true
+  device: cuda
+
+library:
+  name: shapesplat
+  source: shapesplat
+  manifest_path: outputs/prior_library/shapesplat_manifest.json
+  default_objects:
+    - object_id: chair_basic
+      category: chair
+      source_split: official_subset
+      source_gaussian_path: /mnt/hddg1/3dgs-data/priorprobe3dgs/shapesplat_extract/chair_basic/splat.ply
+      source_render_dir: /mnt/hddg1/3dgs-data/priorprobe3dgs/shapesplat_extract/chair_basic/renders
+      gaussian_path: /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/assets/chair/chair_basic/splat.ply
+      render_dir: /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/assets/chair/chair_basic/renders
+      feature_path: /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/features/chair/chair_basic.npy
+      placeholder: true
+      scale_meters: [0.60, 0.90, 0.60]
+      tags: [baseline, indoor]

@@ -1,0 +1,141 @@
+{
+  "selected_priors": [
+    {
+      "source_prior": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/modelnet_bundle_mean_rgb/assets/sofa/sofa_0003/splat.ply",
+      "aligned_prior": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_mean_rgb/office_0/prior_init/aligned_prior_00.ply",
+      "asset_format": "gaussian",
+      "alignment": {
+        "scale": 1.4755096435546875,
+        "rotation_matrix": [
+          [
+            0.9933850765228271,
+            -0.1147744432091713,
+            -0.003593174507841468
+          ],
+          [
+            0.11477557569742203,
+            0.9933914542198181,
+            0.000110262815724127
+          ],
+          [
+            0.0035567735321819782,
+            -0.0005219421000219882,
+            0.9999935626983643
+          ]
+        ],
+        "translation": [
+          -1.366696834564209,
+          -0.9000787734985352,
+          -0.7944577932357788
+        ]
+      },
+      "prior_object_id": "sofa_0003",
+      "prior_score": 0.9997847676277161,
+      "target_object_id": 9,
+      "target_category": "sofa"
+    },
+    {
+      "source_prior": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/modelnet_bundle_mean_rgb/assets/sofa/sofa_0050/splat.ply",
+      "aligned_prior": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_mean_rgb/office_0/prior_init/aligned_prior_01.ply",
+      "asset_format": "gaussian",
+      "alignment": {
+        "scale": 1.5485577583312988,
+        "rotation_matrix": [
+          [
+            0.004679474048316479,
+            -0.9999825954437256,
+            -0.003593174275010824
+          ],
+          [
+            0.9999890327453613,
+            0.004679108038544655,
+            0.00011026269930880517
+          ],
+          [
+            -9.344793215859681e-05,
+            -0.0035936508793383837,
+            0.9999935626983643
+          ]
+        ],
+        "translation": [
+          0.9978115558624268,
+          1.0795893669128418,
+          -0.7876712083816528
+        ]
+      },
+      "prior_object_id": "sofa_0050",
+      "prior_score": 0.999893069267273,
+      "target_object_id": 7,
+      "target_category": "sofa"
+    },
+    {
+      "source_prior": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/modelnet_bundle_mean_rgb/assets/table/table_0020/splat.ply",
+      "aligned_prior": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_mean_rgb/office_0/prior_init/aligned_prior_02.ply",
+      "asset_format": "gaussian",
+      "alignment": {
+        "scale": 1.280279278755188,
+        "rotation_matrix": [
+          [
+            0.9912096261978149,
+            -0.13225185871124268,
+            -0.003593174507841468
+          ],
+          [
+            0.13225309550762177,
+            0.9912159442901611,
+            0.00011026283755199984
+          ],
+          [
+            0.0035470295697450638,
+            -0.0005845020641572773,
+            0.9999935626983643
+          ]
+        ],
+        "translation": [
+          -0.1803870052099228,
+          -0.2670511305332184,
+          -0.8200587034225464
+        ]
+      },
+      "prior_object_id": "table_0020",
+      "prior_score": 0.999835193157196,
+      "target_object_id": 58,
+      "target_category": "table"
+    },
+    {
+      "source_prior": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/shapesplat_stage/modelnet_bundle_mean_rgb/assets/chair/chair_0240/splat.ply",
+      "aligned_prior": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/backend_runs/oracle_prior_vanilla_3dgs_multi_mean_rgb/office_0/prior_init/aligned_prior_03.ply",
+      "asset_format": "gaussian",
+      "alignment": {
+        "scale": 0.9100337624549866,
+        "rotation_matrix": [
+          [
+            0.9723061919212341,
+            -0.23368306457996368,
+            -0.003593174507841468
+          ],
+          [
+            0.2336849570274353,
+            0.9723123908042908,
+            0.00011026282300008461
+          ],
+          [
+            0.0034679214004427195,
+            -0.0009468800853937864,
+            0.9999935626983643
+          ]
+        ],
+        "translation": [
+          0.4183086156845093,
+          0.14526568353176117,
+          -0.7558320760726929
+        ]
+      },
+      "prior_object_id": "chair_0240",
+      "prior_score": 0.9915356636047363,
+      "target_object_id": 61,
+      "target_category": "chair"
+    }
+  ],
+  "init_mode": "merge"
+}

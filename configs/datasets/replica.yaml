@@ -7,7 +7,7 @@ dataset:
   source_path_template: "{root}/{scene_id}"
   images: images
   depths: ""
-  eval: false
+  eval: true
   white_background: false
   scene_type: controlled_indoor
   object_count_range: [1, 3]

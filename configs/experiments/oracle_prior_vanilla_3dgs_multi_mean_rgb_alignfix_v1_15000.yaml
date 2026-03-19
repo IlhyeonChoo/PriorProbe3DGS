@@ -1,0 +1,51 @@
+experiment:
+  name: oracle_prior_vanilla_3dgs_multi_mean_rgb_alignfix_v1_15000
+  initialization: prior
+  reconstruction_backend: vanilla_3dgs
+  dataset_config: configs/datasets/replica_multi_shared.yaml
+  prior_config: configs/priors/generated/shapesplat_modelnet_bundle_mean_rgb_shared.yaml
+  retrieval_mode: oracle_category
+  alignment_mode: oracle_manual
+  adaptation: none
+  prior_object_id: null
+  feature_backend: mean_rgb
+
+oracle:
+  categories: [chair, sofa, table, lamp]
+  max_objects: 4
+
+backend:
+  repo_path: ../3DGS/gaussian-splatting
+  python_executable: ../3DGS/gaussian-splatting/venv/bin/python
+  source_path: /path/to/colmap_scene
+  model_path: CHANGE_ME_DATASET_OUTPUT
+  disable_viewer: true
+  quiet: true
+  dry_run: false
+  init_mode: merge
+
+artifacts:
+  save_initial_snapshot: true
+  initial_render_sets: [train, test]
+
+prior_alignment:
+  anchor_mode: auto
+  yaw_search_degrees: [0, 90, 180, 270]
+  scene_bbox_margin: 0.02
+  target_obb_margin: 1.05
+  overlap_iou_threshold: 0.15
+  prior_overlap_iou_threshold: 0.15
+  outside_scene_ratio_threshold: 0.01
+  non_target_penetration_ratio_threshold: 0.35
+  skip_on_bad_alignment: false
+  max_scene_points: 60000
+  max_prior_points: 16000
+  # Note: domain-gap hypothesis remains open; this preset only isolates
+  # geometry alignment changes for the existing mean_rgb retrieval path.
+
+trainer:
+  iterations: 15000
+  sh_degree: 3
+  test_iterations: [500, 1000, 2000, 3000, 5000, 7000, 10000, 15000]
+  save_iterations: [500, 1000, 2000, 3000, 5000, 7000, 10000, 15000]
+  checkpoint_iterations: []

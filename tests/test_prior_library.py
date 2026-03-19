@@ -4,6 +4,8 @@ import json
 import sys
 from pathlib import Path
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
@@ -70,3 +72,72 @@ def test_retriever_returns_gaussian_path_and_category() -> None:
     assert result.object_id == "chair_basic"
     assert result.gaussian_path == Path("data/chair_basic.ply")
     assert result.category == "chair"
+
+
+def test_retriever_uses_query_features_with_oracle_category(tmp_path: Path) -> None:
+    feature_root = tmp_path / "features"
+    feature_root.mkdir(parents=True)
+    chair_a_feature = feature_root / "chair_a.npy"
+    chair_b_feature = feature_root / "chair_b.npy"
+    np.save(chair_a_feature, np.asarray([1.0, 0.0, 0.0], dtype=np.float32))
+    np.save(chair_b_feature, np.asarray([0.0, 1.0, 0.0], dtype=np.float32))
+
+    library = PriorLibrary(
+        [
+            PriorEntry(
+                object_id="chair_a",
+                category="chair",
+                gaussian_path=Path("data/chair_a.ply"),
+                feature_path=chair_a_feature,
+                metadata=PriorMetadata(category="chair", source="unit_test"),
+            ),
+            PriorEntry(
+                object_id="chair_b",
+                category="chair",
+                gaussian_path=Path("data/chair_b.ply"),
+                feature_path=chair_b_feature,
+                metadata=PriorMetadata(category="chair", source="unit_test"),
+            ),
+        ]
+    )
+
+    retriever = PriorRetriever(library)
+    result = retriever.retrieve(
+        query_features=np.asarray([0.0, 1.0, 0.0], dtype=np.float32),
+        top_k=1,
+        oracle_category="chair",
+    )[0]
+
+    assert result.object_id == "chair_b"
+    assert result.candidate_count == 2
+    assert result.fallback_used is False
+
+
+def test_retriever_falls_back_to_full_library_when_category_is_missing(tmp_path: Path) -> None:
+    feature_root = tmp_path / "features"
+    feature_root.mkdir(parents=True)
+    lamp_feature = feature_root / "lamp.npy"
+    np.save(lamp_feature, np.asarray([0.0, 0.0, 1.0], dtype=np.float32))
+
+    library = PriorLibrary(
+        [
+            PriorEntry(
+                object_id="lamp_a",
+                category="lamp",
+                gaussian_path=Path("data/lamp_a.ply"),
+                feature_path=lamp_feature,
+                metadata=PriorMetadata(category="lamp", source="unit_test"),
+            )
+        ]
+    )
+
+    retriever = PriorRetriever(library)
+    result = retriever.retrieve(
+        query_features=np.asarray([0.0, 0.0, 1.0], dtype=np.float32),
+        top_k=1,
+        oracle_category="chair",
+    )[0]
+
+    assert result.object_id == "lamp_a"
+    assert result.candidate_count == 1
+    assert result.fallback_used is True
