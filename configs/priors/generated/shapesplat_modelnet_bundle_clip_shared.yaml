@@ -9,7 +9,7 @@ asset_prep:
 library:
   name: shapesplat_modelnet_bundle
   source: shapesplat_modelnet
-  manifest_path: /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/outputs/prior_library/shapesplat_modelnet_bundle_clip_manifest.json
+  manifest_path: outputs/pointcloud/prior_library/shapesplat_modelnet_bundle_clip_manifest.json
   default_objects:
   - object_id: chair_0001
     category: chair

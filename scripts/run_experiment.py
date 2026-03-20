@@ -40,6 +40,7 @@ from priorprobe.optimization.vanilla_3dgs import (
 from priorprobe.prior_library.library import PriorLibrary
 from priorprobe.replica_export import quaternion_xyzw_to_rotation_matrix
 from priorprobe.retrieval.retriever import PriorRetriever, RetrievalResult
+from priorprobe.runtime_paths import resolve_runtime_path
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -61,6 +62,15 @@ def resolve_override(path_value: Path | None) -> Path | None:
     if path_value is None:
         return None
     return path_value if path_value.is_absolute() else ROOT / path_value
+
+
+def default_outputs_root() -> Path:
+    return resolve_runtime_path(ROOT, "outputs_dir", fallback="outputs")
+
+
+def resolve_outputs_root(path_value: Path | None) -> Path:
+    override = resolve_override(path_value)
+    return override if override is not None else default_outputs_root()
 
 
 def is_placeholder_path(path_value: str | None) -> bool:
@@ -86,8 +96,13 @@ def load_dataset_scene(
     return resolve_dataset_scene(spec, scene_id=scene_id_override, root_override=root_override)
 
 
-def experiment_output_dir(experiment_name: str, scene_id: str | None = None) -> Path:
-    output_path = ROOT / "outputs" / "experiments" / experiment_name
+def experiment_output_dir(
+    experiment_name: str,
+    scene_id: str | None = None,
+    *,
+    outputs_root: Path | None = None,
+) -> Path:
+    output_path = (outputs_root or default_outputs_root()) / "experiments" / experiment_name
     if scene_id is not None:
         output_path = output_path / scene_id
     return output_path
@@ -106,8 +121,14 @@ def archive_existing_path(path: Path) -> Path | None:
     return candidate
 
 
-def write_evaluation(experiment_name: str, payload: dict[str, Any], *, scene_id: str | None = None) -> Path:
-    output_path = experiment_output_dir(experiment_name, scene_id=scene_id) / "evaluation.json"
+def write_evaluation(
+    experiment_name: str,
+    payload: dict[str, Any],
+    *,
+    scene_id: str | None = None,
+    outputs_root: Path | None = None,
+) -> Path:
+    output_path = experiment_output_dir(experiment_name, scene_id=scene_id, outputs_root=outputs_root) / "evaluation.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return output_path
@@ -397,12 +418,12 @@ def build_metrics_command(config: Vanilla3DGSBackendConfig) -> list[str]:
     ]
 
 
-def run_placeholder_experiment(config: dict[str, Any]) -> int:
+def run_placeholder_experiment(config: dict[str, Any], *, outputs_root: Path) -> int:
     experiment = config["experiment"]
     trainer_config = config["trainer"]
     target_quality = trainer_config.get("target_quality", {})
 
-    trainer = PriorProbeTrainer(output_root=ROOT / "outputs")
+    trainer = PriorProbeTrainer(output_root=outputs_root)
     retrieval_score = None
     alignment_score = None
 
@@ -462,7 +483,11 @@ def run_placeholder_experiment(config: dict[str, Any]) -> int:
         retrieval_score=retrieval_score,
         alignment_score=alignment_score,
     )
-    evaluation_path = write_evaluation(experiment["name"], evaluation.to_dict())
+    evaluation_path = write_evaluation(
+        experiment["name"],
+        evaluation.to_dict(),
+        outputs_root=outputs_root,
+    )
     print(f"Saved run summary to {run_path}")
     print(f"Saved evaluation to {evaluation_path}")
     return 0
@@ -521,6 +546,7 @@ def select_priors(
 def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace) -> int:
     experiment = config["experiment"]
     trainer_config = config.get("trainer", {})
+    outputs_root = resolve_outputs_root(args.outputs_dir)
     dataset_scene = load_dataset_scene(
         config,
         scene_id_override=args.dataset_scene_id,
@@ -536,7 +562,7 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
         backend_payload["white_background"] = dataset_scene.white_background
         if is_placeholder_path(backend_payload.get("model_path")) and args.backend_model_path is None:
             backend_payload["model_path"] = str(
-                ROOT / "outputs" / "backend_runs" / experiment["name"] / dataset_scene.scene_id
+                outputs_root / "backend_runs" / experiment["name"] / dataset_scene.scene_id
             )
 
     backend_config = Vanilla3DGSBackendConfig.from_payload(
@@ -552,6 +578,7 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
     output_dir = experiment_output_dir(
         experiment["name"],
         scene_id=dataset_scene.scene_id if dataset_scene is not None else None,
+        outputs_root=outputs_root,
     )
     archived_output_dir: Path | None = None
     archived_model_path: Path | None = None
@@ -1012,6 +1039,7 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
             experiment["name"],
             evaluation.to_dict(),
             scene_id=dataset_scene.scene_id if dataset_scene is not None else None,
+            outputs_root=outputs_root,
         )
         print(f"Saved evaluation to {evaluation_path}")
 
@@ -1031,6 +1059,7 @@ def main() -> int:
     parser.add_argument("--prior-config", type=Path, help="Optional override for experiment.prior_config.")
     parser.add_argument("--backend-source-path", type=Path, help="Optional override for backend.source_path.")
     parser.add_argument("--backend-model-path", type=Path, help="Optional override for backend.model_path.")
+    parser.add_argument("--outputs-dir", type=Path, help="Optional override for the outputs root directory.")
     parser.add_argument(
         "--alignment-transform-path",
         type=Path,
@@ -1044,7 +1073,7 @@ def main() -> int:
         config.setdefault("experiment", {})["prior_config"] = str(args.prior_config)
     if config["experiment"].get("reconstruction_backend") == "vanilla_3dgs":
         return run_vanilla_3dgs_experiment(config, args)
-    return run_placeholder_experiment(config)
+    return run_placeholder_experiment(config, outputs_root=resolve_outputs_root(args.outputs_dir))
 
 
 if __name__ == "__main__":

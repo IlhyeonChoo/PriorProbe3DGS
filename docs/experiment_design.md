@@ -39,3 +39,7 @@ PriorProbe3DGS 1단계는 prior 효과를 다른 가속 요소와 분리해서 �
 - reconstruction target은 `configs/datasets/` 아래에서 선택하며, 현재 템플릿은 `shapesplat_objects`, `replica`, `scannet`, `nerf_synthetic`, `custom_capture`를 포함한다.
 - `scripts/run_experiment.py`는 dataset config에서 `source_path`, `images`, `depths`, `eval`, `white_background`를 읽어 backend 인자를 채운다.
 - scene별 실제 루트는 `--dataset-root`, 특정 장면은 `--dataset-scene-id`로 덮어쓸 수 있다.
+
+## Branch-Specific Notes
+
+- pointcloud 기준선 브랜치의 배경과 운영 계획은 `docs/pointcloud_branch_plan.md`에 별도로 정리한다.
