@@ -12,6 +12,7 @@ from PIL import Image
 from plyfile import PlyData
 
 from priorprobe.prior_assets import build_prior_library, stage_shapesplat_assets
+from priorprobe.runtime_paths import to_repo_relative_path
 
 
 SH_C0 = 0.28209479177387814
@@ -242,6 +243,7 @@ def build_modelnet_prior_config(
     manifest_path: Path,
     stage_root: Path,
     category: str,
+    root: Path | None = None,
     feature_backend: str = "open_clip",
     feature_model_name: str = "ViT-B-32",
     feature_pretrained: str = "laion2b_s34b_b79k",
@@ -250,6 +252,9 @@ def build_modelnet_prior_config(
     allow_fallback: bool = True,
     device: str = "cuda",
 ) -> dict[str, Any]:
+    manifest_path_value = (
+        to_repo_relative_path(manifest_path, root=root) if root is not None else str(manifest_path)
+    )
     default_objects = []
     for asset in assets:
         default_objects.append(
@@ -284,7 +289,7 @@ def build_modelnet_prior_config(
         "library": {
             "name": f"shapesplat_modelnet_{category}",
             "source": "shapesplat_modelnet",
-            "manifest_path": str(manifest_path),
+            "manifest_path": manifest_path_value,
             "default_objects": default_objects,
         },
     }
@@ -332,6 +337,7 @@ def prepare_modelnet_prior_library(
         manifest_path=manifest_out,
         stage_root=stage_root,
         category=category,
+        root=root,
         feature_backend=feature_backend,
         feature_model_name=feature_model_name,
         feature_pretrained=feature_pretrained,
@@ -361,6 +367,7 @@ def build_modelnet_prior_bundle_config(
     *,
     manifest_path: Path,
     stage_root: Path,
+    root: Path | None = None,
     feature_backend: str = "open_clip",
     feature_model_name: str = "ViT-B-32",
     feature_pretrained: str = "laion2b_s34b_b79k",
@@ -369,6 +376,9 @@ def build_modelnet_prior_bundle_config(
     allow_fallback: bool = True,
     device: str = "cuda",
 ) -> dict[str, Any]:
+    manifest_path_value = (
+        to_repo_relative_path(manifest_path, root=root) if root is not None else str(manifest_path)
+    )
     default_objects: list[dict[str, Any]] = []
     for category, assets in assets_by_category.items():
         for asset in assets:
@@ -403,7 +413,7 @@ def build_modelnet_prior_bundle_config(
         "library": {
             "name": "shapesplat_modelnet_bundle",
             "source": "shapesplat_modelnet",
-            "manifest_path": str(manifest_path),
+            "manifest_path": manifest_path_value,
             "default_objects": default_objects,
         },
     }
@@ -446,6 +456,7 @@ def prepare_modelnet_prior_bundle(
         assets_by_category,
         manifest_path=manifest_out,
         stage_root=stage_root,
+        root=root,
         feature_backend=feature_backend,
         feature_model_name=feature_model_name,
         feature_pretrained=feature_pretrained,

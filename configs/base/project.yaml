@@ -6,8 +6,8 @@ project:
 runtime:
   seed: 42
   device: cuda
-  outputs_dir: outputs
-  logs_dir: logs
+  outputs_dir: outputs/gaussian_direct
+  logs_dir: logs/gaussian_direct
 
 metrics:
   primary:

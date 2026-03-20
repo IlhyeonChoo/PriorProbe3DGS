@@ -10,7 +10,7 @@ asset_prep:
 library:
   name: shapesplat
   source: shapesplat
-  manifest_path: outputs/prior_library/shapesplat_manifest.json
+  manifest_path: outputs/gaussian_direct/prior_library/shapesplat_manifest.json
   default_objects:
     - object_id: chair_basic
       category: chair
