@@ -4,10 +4,16 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from priorprobe.runtime_paths import resolve_runtime_path
 
 
 def _resolve(path: Path) -> Path:
@@ -122,17 +128,24 @@ def to_markdown_table(rows: list[dict[str, Any]]) -> str:
 
 
 def main() -> int:
+    default_outputs_dir = resolve_runtime_path(ROOT, "outputs_dir", fallback="outputs")
+    default_reports_dir = default_outputs_dir / "reports"
+
     parser = argparse.ArgumentParser(description="Export experiment results to Markdown and CSV tables.")
-    parser.add_argument("--outputs-dir", default="outputs", type=Path)
-    parser.add_argument("--markdown-output", default="outputs/reports/summary.md", type=Path)
-    parser.add_argument("--summary-csv", default="outputs/reports/summary.csv", type=Path)
-    parser.add_argument("--checkpoint-csv", default="outputs/reports/checkpoints.csv", type=Path)
+    parser.add_argument("--outputs-dir", type=Path)
+    parser.add_argument("--markdown-output", type=Path)
+    parser.add_argument("--summary-csv", type=Path)
+    parser.add_argument("--checkpoint-csv", type=Path)
     args = parser.parse_args()
 
-    outputs_dir = _resolve(args.outputs_dir)
-    markdown_output = _resolve(args.markdown_output)
-    summary_csv = _resolve(args.summary_csv)
-    checkpoint_csv = _resolve(args.checkpoint_csv)
+    outputs_dir = _resolve(args.outputs_dir) if args.outputs_dir is not None else default_outputs_dir
+    markdown_output = (
+        _resolve(args.markdown_output) if args.markdown_output is not None else default_reports_dir / "summary.md"
+    )
+    summary_csv = _resolve(args.summary_csv) if args.summary_csv is not None else default_reports_dir / "summary.csv"
+    checkpoint_csv = (
+        _resolve(args.checkpoint_csv) if args.checkpoint_csv is not None else default_reports_dir / "checkpoints.csv"
+    )
 
     evaluations = collect_evaluations(outputs_dir)
     summary_rows = [_summary_row(evaluation) for evaluation in evaluations]
