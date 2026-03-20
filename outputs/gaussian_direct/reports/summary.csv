@@ -1,0 +1,1 @@
+experiment_name,backend,initialization,status,dataset_name,scene_id,total_optimization_time_sec,time_to_target_quality_sec,target_psnr,final_iteration,psnr,ssim,lpips,gaussian_count,retrieval_accuracy,prior_object_id,prior_category,prior_count,prior_object_ids,warning_count
