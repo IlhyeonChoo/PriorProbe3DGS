@@ -1,0 +1,169 @@
+{
+  "experiment_name": "gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000",
+  "backend": "vanilla_3dgs",
+  "initialization": "from_scratch",
+  "alignment_mode": "none",
+  "insertion_representation": "pointcloud_proxy",
+  "status": "completed",
+  "repo_path": "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting",
+  "source_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/office_0",
+  "model_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0",
+  "dataset_scene": {
+    "dataset_name": "replica",
+    "scene_id": "office_0",
+    "format": "colmap",
+    "source_path": "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/office_0",
+    "images": "images",
+    "depths": "",
+    "eval": true,
+    "white_background": false,
+    "notes": [
+      "Replica multi-object oracle exports are staged on SSD for actual training runs.",
+      "Scene subsets are rendered with scene-centric camera paths for top-K supported objects."
+    ]
+  },
+  "command": [
+    "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/../3DGS/gaussian-splatting/venv/bin/python",
+    "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/scripts/train_vanilla_3dgs_backend.py",
+    "--repo-path",
+    "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting",
+    "--source_path",
+    "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/office_0",
+    "--model_path",
+    "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0",
+    "--images",
+    "images",
+    "--sh_degree",
+    "3",
+    "--iterations",
+    "1000",
+    "--test_iterations",
+    "250",
+    "500",
+    "1000",
+    "--save_iterations",
+    "250",
+    "500",
+    "1000",
+    "--disable_viewer",
+    "--eval",
+    "--quiet",
+    "--save-initial-snapshot",
+    "--initial-render-sets",
+    "train",
+    "test"
+  ],
+  "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/scripts/train_vanilla_3dgs_backend.py --repo-path /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting --source_path /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/office_0 --model_path /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0 --images images --sh_degree 3 --iterations 1000 --test_iterations 250 500 1000 --save_iterations 250 500 1000 --disable_viewer --eval --quiet --save-initial-snapshot --initial-render-sets train test",
+  "alignment_json": null,
+  "prior_spec_json": null,
+  "generated_alignment": null,
+  "generated_alignments": [],
+  "generated_alignment_candidates": [],
+  "initial_snapshot": {
+    "point_cloud": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/point_cloud/iteration_0/point_cloud.ply",
+    "render_sets": {
+      "train": {
+        "renders": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/train/ours_0/renders",
+        "gt": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/train/ours_0/gt"
+      },
+      "test": {
+        "renders": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/test/ours_0/renders",
+        "gt": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/test/ours_0/gt"
+      }
+    }
+  },
+  "selected_prior": null,
+  "selected_priors": [],
+  "oracle_target": null,
+  "oracle_targets": [],
+  "render_runs": [
+    {
+      "iteration": 250,
+      "command": [
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/../3DGS/gaussian-splatting/venv/bin/python",
+        "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py",
+        "--source_path",
+        "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/office_0",
+        "--model_path",
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0",
+        "--images",
+        "images",
+        "--iteration",
+        "250",
+        "--skip_train",
+        "--eval",
+        "--quiet"
+      ],
+      "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py --source_path /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/office_0 --model_path /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0 --images images --iteration 250 --skip_train --eval --quiet",
+      "return_code": 0,
+      "elapsed_sec": 2.682741057127714,
+      "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/experiments/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/render_250_stdout.log",
+      "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/experiments/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/render_250_stderr.log"
+    },
+    {
+      "iteration": 500,
+      "command": [
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/../3DGS/gaussian-splatting/venv/bin/python",
+        "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py",
+        "--source_path",
+        "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/office_0",
+        "--model_path",
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0",
+        "--images",
+        "images",
+        "--iteration",
+        "500",
+        "--skip_train",
+        "--eval",
+        "--quiet"
+      ],
+      "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py --source_path /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/office_0 --model_path /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0 --images images --iteration 500 --skip_train --eval --quiet",
+      "return_code": 0,
+      "elapsed_sec": 2.628594433888793,
+      "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/experiments/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/render_500_stdout.log",
+      "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/experiments/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/render_500_stderr.log"
+    },
+    {
+      "iteration": 1000,
+      "command": [
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/../3DGS/gaussian-splatting/venv/bin/python",
+        "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py",
+        "--source_path",
+        "/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/office_0",
+        "--model_path",
+        "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0",
+        "--images",
+        "images",
+        "--iteration",
+        "1000",
+        "--skip_train",
+        "--eval",
+        "--quiet"
+      ],
+      "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/render.py --source_path /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi/office_0 --model_path /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0 --images images --iteration 1000 --skip_train --eval --quiet",
+      "return_code": 0,
+      "elapsed_sec": 2.544807530939579,
+      "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/experiments/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/render_1000_stdout.log",
+      "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/experiments/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/render_1000_stderr.log"
+    }
+  ],
+  "metrics_run": {
+    "command": [
+      "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/../3DGS/gaussian-splatting/venv/bin/python",
+      "/home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/metrics.py",
+      "--model_paths",
+      "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0"
+    ],
+    "command_string": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/../3DGS/gaussian-splatting/venv/bin/python /home/ilhyeonchu/ReCompose3D/3DGS/gaussian-splatting/metrics.py --model_paths /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0",
+    "return_code": 0,
+    "elapsed_sec": 24.26583338994533,
+    "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/experiments/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/metrics_stdout.log",
+    "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/experiments/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/metrics_stderr.log"
+  },
+  "archived_output_dir": null,
+  "archived_model_path": null,
+  "return_code": 0,
+  "elapsed_sec": 14.829993594903499,
+  "stdout_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/experiments/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/backend_stdout.log",
+  "stderr_log": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/experiments/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0/backend_stderr.log"
+}

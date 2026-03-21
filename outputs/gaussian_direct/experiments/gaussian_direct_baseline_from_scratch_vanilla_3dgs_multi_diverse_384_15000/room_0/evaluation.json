@@ -1,0 +1,107 @@
+{
+  "experiment_name": "gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_diverse_384_15000",
+  "backend": "vanilla_3dgs",
+  "initialization": "from_scratch",
+  "status": "completed",
+  "dataset_name": "replica",
+  "scene_id": "room_0",
+  "model_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_diverse_384_15000/room_0",
+  "total_optimization_time_sec": 594.2354075768963,
+  "time_to_target_quality_sec": null,
+  "target_psnr": null,
+  "final_iteration": 15000,
+  "psnr": 12.487881660461426,
+  "ssim": 0.5459524393081665,
+  "lpips": 0.3359781801700592,
+  "retrieval_accuracy": null,
+  "alignment_success_rate": null,
+  "gaussian_count": 3916981,
+  "prior_object_id": null,
+  "prior_category": null,
+  "prior_object_ids": [],
+  "prior_count": 0,
+  "checkpoint_metrics": [
+    {
+      "iteration": 0,
+      "method": "ours_0",
+      "psnr": 8.870147705078125,
+      "ssim": 0.0946967601776123,
+      "lpips": 0.8029807209968567,
+      "gaussian_count": 100000,
+      "estimated_elapsed_sec": 0.0
+    },
+    {
+      "iteration": 500,
+      "method": "ours_500",
+      "psnr": 9.663907051086426,
+      "ssim": 0.05905984714627266,
+      "lpips": 0.8285832405090332,
+      "gaussian_count": 100000,
+      "estimated_elapsed_sec": 19.807847
+    },
+    {
+      "iteration": 1000,
+      "method": "ours_1000",
+      "psnr": 9.76069164276123,
+      "ssim": 0.09295570105314255,
+      "lpips": 0.7897117733955383,
+      "gaussian_count": 153385,
+      "estimated_elapsed_sec": 39.615694
+    },
+    {
+      "iteration": 2000,
+      "method": "ours_2000",
+      "psnr": 10.182926177978516,
+      "ssim": 0.1773054450750351,
+      "lpips": 0.6904603838920593,
+      "gaussian_count": 590100,
+      "estimated_elapsed_sec": 79.231388
+    },
+    {
+      "iteration": 3000,
+      "method": "ours_3000",
+      "psnr": 10.628532409667969,
+      "ssim": 0.25277480483055115,
+      "lpips": 0.6009359359741211,
+      "gaussian_count": 1152886,
+      "estimated_elapsed_sec": 118.847082
+    },
+    {
+      "iteration": 5000,
+      "method": "ours_5000",
+      "psnr": 11.467544555664062,
+      "ssim": 0.3887096643447876,
+      "lpips": 0.46311330795288086,
+      "gaussian_count": 2080839,
+      "estimated_elapsed_sec": 198.078469
+    },
+    {
+      "iteration": 7000,
+      "method": "ours_7000",
+      "psnr": 11.805258750915527,
+      "ssim": 0.44690337777137756,
+      "lpips": 0.4041561186313629,
+      "gaussian_count": 2672633,
+      "estimated_elapsed_sec": 277.309857
+    },
+    {
+      "iteration": 10000,
+      "method": "ours_10000",
+      "psnr": 12.17712688446045,
+      "ssim": 0.5043143630027771,
+      "lpips": 0.3622593879699707,
+      "gaussian_count": 3286627,
+      "estimated_elapsed_sec": 396.156938
+    },
+    {
+      "iteration": 15000,
+      "method": "ours_15000",
+      "psnr": 12.487881660461426,
+      "ssim": 0.5459524393081665,
+      "lpips": 0.3359781801700592,
+      "gaussian_count": 3916981,
+      "estimated_elapsed_sec": 594.235408
+    }
+  ],
+  "warnings": []
+}

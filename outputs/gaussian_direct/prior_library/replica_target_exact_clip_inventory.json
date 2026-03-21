@@ -1,0 +1,106 @@
+[
+  {
+    "scene_id": "room_0",
+    "object_id": 6,
+    "category": "lamp",
+    "point_count": 25000,
+    "bbox_size": [
+      0.9043786525726318,
+      2.5480339527130127,
+      1.3938593864440918
+    ],
+    "anchor_mode": "floor",
+    "source_gaussian_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/source_assets/room_0/6/splat.ply"
+  },
+  {
+    "scene_id": "room_0",
+    "object_id": 9,
+    "category": "sofa",
+    "point_count": 25000,
+    "bbox_size": [
+      2.403555393218994,
+      1.3626773357391357,
+      0.9077222347259521
+    ],
+    "anchor_mode": "floor",
+    "source_gaussian_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/source_assets/room_0/9/splat.ply"
+  },
+  {
+    "scene_id": "room_0",
+    "object_id": 77,
+    "category": "sofa",
+    "point_count": 25000,
+    "bbox_size": [
+      2.3425323963165283,
+      1.1306549310684204,
+      0.9139622449874878
+    ],
+    "anchor_mode": "floor",
+    "source_gaussian_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/source_assets/room_0/77/splat.ply"
+  },
+  {
+    "scene_id": "room_0",
+    "object_id": 74,
+    "category": "chair",
+    "point_count": 25000,
+    "bbox_size": [
+      0.8969669342041016,
+      0.8423287868499756,
+      1.0819392204284668
+    ],
+    "anchor_mode": "floor",
+    "source_gaussian_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/source_assets/room_0/74/splat.ply"
+  },
+  {
+    "scene_id": "office_0",
+    "object_id": 9,
+    "category": "sofa",
+    "point_count": 25000,
+    "bbox_size": [
+      0.9763556718826294,
+      2.963501453399658,
+      0.7237553596496582
+    ],
+    "anchor_mode": "floor",
+    "source_gaussian_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/source_assets/office_0/9/splat.ply"
+  },
+  {
+    "scene_id": "office_0",
+    "object_id": 7,
+    "category": "sofa",
+    "point_count": 25000,
+    "bbox_size": [
+      1.1035385131835938,
+      1.8532747030258179,
+      0.7096786499023438
+    ],
+    "anchor_mode": "floor",
+    "source_gaussian_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/source_assets/office_0/7/splat.ply"
+  },
+  {
+    "scene_id": "office_0",
+    "object_id": 58,
+    "category": "table",
+    "point_count": 25000,
+    "bbox_size": [
+      1.0567647218704224,
+      1.253953456878662,
+      0.6251139044761658
+    ],
+    "anchor_mode": "floor",
+    "source_gaussian_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/source_assets/office_0/58/splat.ply"
+  },
+  {
+    "scene_id": "office_0",
+    "object_id": 61,
+    "category": "chair",
+    "point_count": 25000,
+    "bbox_size": [
+      0.6850882768630981,
+      0.6229714155197144,
+      0.7539177536964417
+    ],
+    "anchor_mode": "floor",
+    "source_gaussian_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/source_assets/office_0/61/splat.ply"
+  }
+]

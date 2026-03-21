@@ -1,0 +1,569 @@
+{
+  "selected_priors": [
+    {
+      "source_prior": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/lamp/replica_room_0_obj_6/splat.ply",
+      "aligned_prior": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_same_scene_exact_clip_diverse_384_15000/room_0/prior_init/aligned_prior_00.ply",
+      "asset_format": "gaussian",
+      "alignment": {
+        "scale": [
+          0.9945613145828247,
+          0.997078537940979,
+          0.9949074983596802
+        ],
+        "rotation_matrix": [
+          [
+            0.03861180320382118,
+            -0.9992476105690002,
+            -0.0036468247417360544
+          ],
+          [
+            0.9992493391036987,
+            0.03862284868955612,
+            -0.0030083837918937206
+          ],
+          [
+            0.003146971110254526,
+            -0.0035279279109090567,
+            0.999988853931427
+          ]
+        ],
+        "translation": [
+          -0.45332416892051697,
+          -3.370871067047119,
+          -1.5204566717147827
+        ]
+      },
+      "prior_object_id": "replica_room_0_obj_6",
+      "prior_score": 1.0,
+      "normalized_confidence": 1.0,
+      "point_keep_ratio": 1.0,
+      "dropped": false,
+      "drop_reason": null,
+      "target_object_id": 6,
+      "target_category": "lamp",
+      "alignment_debug": {
+        "target_category": "lamp",
+        "target_object_id": 6,
+        "target_center": [
+          -0.455865740776062,
+          -3.3729677200317383,
+          -0.8235347270965576
+        ],
+        "target_sizes": [
+          0.9043786525726318,
+          2.5480339527130127,
+          1.3938593864440918
+        ],
+        "target_rotation_matrix": [
+          [
+            0.03861180320382118,
+            -0.9992476105690002,
+            -0.0036468247417360544
+          ],
+          [
+            0.9992493391036987,
+            0.03862284868955612,
+            -0.0030083837918937206
+          ],
+          [
+            0.003146971110254526,
+            -0.0035279279109090567,
+            0.999988853931427
+          ]
+        ],
+        "target_bottom_anchor": [
+          -0.45332416892051697,
+          -3.370871067047119,
+          -1.5204566717147827
+        ],
+        "source_prior_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/lamp/replica_room_0_obj_6/splat.ply",
+        "canonical_seed_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/lamp/replica_room_0_obj_6/canonical_seed_floor.ply",
+        "prior_object_id": "replica_room_0_obj_6",
+        "prior_category": "lamp",
+        "support_type": "floor",
+        "anchor_mode": "floor",
+        "scale_mode": "anisotropic",
+        "yaw_deg": 0.0,
+        "scale_vec": [
+          0.9945613145828247,
+          0.997078537940979,
+          0.9949074983596802
+        ],
+        "candidate_center_world": [
+          -0.455865740776062,
+          -3.3729677200317383,
+          -0.8235347270965576
+        ],
+        "candidate_sizes_world": [
+          0.9043786525726318,
+          2.5480339527130127,
+          1.3938593864440918
+        ],
+        "candidate_aabb_min": [
+          -1.7489255666732788,
+          -3.8761203289031982,
+          -1.526374340057373
+        ],
+        "candidate_aabb_max": [
+          0.8371940851211548,
+          -2.8698151111602783,
+          -0.12069511413574219
+        ],
+        "outside_scene_ratio": 0.0,
+        "non_target_penetration_ratio": 0.0,
+        "other_target_max_iou": 0.0,
+        "prior_target_max_iou": 0.0,
+        "accepted": true,
+        "rejected_reasons": [],
+        "dropped": false,
+        "drop_reason": null,
+        "candidate_count": 1,
+        "fallback_used": false,
+        "feature_backend": "clip",
+        "center_error": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bottom_error": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "alignment_candidates_json": null,
+        "alignment_mode": "oracle_target_box",
+        "alignment_json": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/experiments/gaussian_direct_same_scene_exact_clip_diverse_384_15000/room_0/generated_alignment_6_00.json"
+      },
+      "source_prior_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/lamp/replica_room_0_obj_6/splat.ply",
+      "canonical_seed_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/lamp/replica_room_0_obj_6/canonical_seed_floor.ply",
+      "requested_point_keep_ratio": 1.0,
+      "original_point_count": 25000,
+      "applied_point_keep_ratio": 1.0,
+      "kept_point_count": 25000
+    },
+    {
+      "source_prior": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/sofa/replica_room_0_obj_9/splat.ply",
+      "aligned_prior": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_same_scene_exact_clip_diverse_384_15000/room_0/prior_init/aligned_prior_01.ply",
+      "asset_format": "gaussian",
+      "alignment": {
+        "scale": [
+          1.0000569820404053,
+          0.9985827803611755,
+          1.000606656074524
+        ],
+        "rotation_matrix": [
+          [
+            0.9949318170547485,
+            -0.1004859134554863,
+            -0.0036468245089054108
+          ],
+          [
+            0.10047520697116852,
+            0.9949350357055664,
+            -0.0030083837918937206
+          ],
+          [
+            0.003930653445422649,
+            0.0026267212815582752,
+            0.999988853931427
+          ]
+        ],
+        "translation": [
+          3.6263225078582764,
+          -0.8946581482887268,
+          -1.5134899616241455
+        ]
+      },
+      "prior_object_id": "replica_room_0_obj_9",
+      "prior_score": 1.0,
+      "normalized_confidence": 1.0,
+      "point_keep_ratio": 1.0,
+      "dropped": false,
+      "drop_reason": null,
+      "target_object_id": 9,
+      "target_category": "sofa",
+      "alignment_debug": {
+        "target_category": "sofa",
+        "target_object_id": 9,
+        "target_center": [
+          3.6246674060821533,
+          -0.8960235118865967,
+          -1.0596339702606201
+        ],
+        "target_sizes": [
+          2.403555393218994,
+          1.3626773357391357,
+          0.9077222347259521
+        ],
+        "target_rotation_matrix": [
+          [
+            0.9949318170547485,
+            -0.1004859134554863,
+            -0.0036468245089054108
+          ],
+          [
+            0.10047520697116852,
+            0.9949350357055664,
+            -0.0030083837918937206
+          ],
+          [
+            0.003930653445422649,
+            0.0026267212815582752,
+            0.999988853931427
+          ]
+        ],
+        "target_bottom_anchor": [
+          3.6263225078582764,
+          -0.8946581482887268,
+          -1.5134899616241455
+        ],
+        "source_prior_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/sofa/replica_room_0_obj_9/splat.ply",
+        "canonical_seed_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/sofa/replica_room_0_obj_9/canonical_seed_floor.ply",
+        "prior_object_id": "replica_room_0_obj_9",
+        "prior_category": "sofa",
+        "support_type": "floor",
+        "anchor_mode": "floor",
+        "scale_mode": "anisotropic",
+        "yaw_deg": 0.0,
+        "scale_vec": [
+          1.0000569820404053,
+          0.9985827803611755,
+          1.000606656074524
+        ],
+        "candidate_center_world": [
+          3.6246674060821533,
+          -0.8960235118865967,
+          -1.0596339702606201
+        ],
+        "candidate_sizes_world": [
+          2.403555393218994,
+          1.3626773357391357,
+          0.9077222347259521
+        ],
+        "candidate_aabb_min": [
+          2.358860492706299,
+          -1.6960253715515137,
+          -1.5200035572052002
+        ],
+        "candidate_aabb_max": [
+          4.890474319458008,
+          -0.09602159261703491,
+          -0.5992644429206848
+        ],
+        "outside_scene_ratio": 0.0,
+        "non_target_penetration_ratio": 0.0,
+        "other_target_max_iou": 0.0,
+        "prior_target_max_iou": 0.0,
+        "accepted": true,
+        "rejected_reasons": [],
+        "dropped": false,
+        "drop_reason": null,
+        "candidate_count": 1,
+        "fallback_used": false,
+        "feature_backend": "clip",
+        "center_error": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bottom_error": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "alignment_candidates_json": null,
+        "alignment_mode": "oracle_target_box",
+        "alignment_json": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/experiments/gaussian_direct_same_scene_exact_clip_diverse_384_15000/room_0/generated_alignment_9_01.json"
+      },
+      "source_prior_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/sofa/replica_room_0_obj_9/splat.ply",
+      "canonical_seed_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/sofa/replica_room_0_obj_9/canonical_seed_floor.ply",
+      "requested_point_keep_ratio": 1.0,
+      "original_point_count": 25000,
+      "applied_point_keep_ratio": 1.0,
+      "kept_point_count": 25000
+    },
+    {
+      "source_prior": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/sofa/replica_room_0_obj_77/splat.ply",
+      "aligned_prior": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_same_scene_exact_clip_diverse_384_15000/room_0/prior_init/aligned_prior_02.ply",
+      "asset_format": "gaussian",
+      "alignment": {
+        "scale": [
+          0.9995637536048889,
+          0.9996412396430969,
+          1.003361701965332
+        ],
+        "rotation_matrix": [
+          [
+            0.9995654821395874,
+            -0.02924969047307968,
+            -0.003646824276074767
+          ],
+          [
+            0.029238786548376083,
+            0.9995679259300232,
+            -0.0030083833262324333
+          ],
+          [
+            0.0037332428619265556,
+            0.0029004474636167288,
+            0.999988853931427
+          ]
+        ],
+        "translation": [
+          3.8262100219726562,
+          2.5313286781311035,
+          -1.5235003232955933
+        ]
+      },
+      "prior_object_id": "replica_room_0_obj_77",
+      "prior_score": 1.0,
+      "normalized_confidence": 1.0,
+      "point_keep_ratio": 1.0,
+      "dropped": false,
+      "drop_reason": null,
+      "target_object_id": 77,
+      "target_category": "sofa",
+      "alignment_debug": {
+        "target_category": "sofa",
+        "target_object_id": 77,
+        "target_center": [
+          3.8245434761047363,
+          2.529953956604004,
+          -1.0665242671966553
+        ],
+        "target_sizes": [
+          2.3425323963165283,
+          1.1306549310684204,
+          0.9139622449874878
+        ],
+        "target_rotation_matrix": [
+          [
+            0.9995654821395874,
+            -0.02924969047307968,
+            -0.003646824276074767
+          ],
+          [
+            0.029238786548376083,
+            0.9995679259300232,
+            -0.0030083833262324333
+          ],
+          [
+            0.0037332428619265556,
+            0.0029004474636167288,
+            0.999988853931427
+          ]
+        ],
+        "target_bottom_anchor": [
+          3.8262100219726562,
+          2.5313286781311035,
+          -1.5235003232955933
+        ],
+        "source_prior_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/sofa/replica_room_0_obj_77/splat.ply",
+        "canonical_seed_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/sofa/replica_room_0_obj_77/canonical_seed_floor.ply",
+        "prior_object_id": "replica_room_0_obj_77",
+        "prior_category": "sofa",
+        "support_type": "floor",
+        "anchor_mode": "floor",
+        "scale_mode": "anisotropic",
+        "yaw_deg": 0.0,
+        "scale_vec": [
+          0.9995637536048889,
+          0.9996412396430969,
+          1.003361701965332
+        ],
+        "candidate_center_world": [
+          3.8245434761047363,
+          2.529953956604004,
+          -1.0665242671966553
+        ],
+        "candidate_sizes_world": [
+          2.3425323963165283,
+          1.1306549310684204,
+          0.9139622449874878
+        ],
+        "candidate_aabb_min": [
+          2.6355838775634766,
+          1.9292495250701904,
+          -1.529512643814087
+        ],
+        "candidate_aabb_max": [
+          5.013503074645996,
+          3.1306583881378174,
+          -0.6035358905792236
+        ],
+        "outside_scene_ratio": 0.0,
+        "non_target_penetration_ratio": 0.0,
+        "other_target_max_iou": 0.0,
+        "prior_target_max_iou": 0.0,
+        "accepted": true,
+        "rejected_reasons": [],
+        "dropped": false,
+        "drop_reason": null,
+        "candidate_count": 1,
+        "fallback_used": false,
+        "feature_backend": "clip",
+        "center_error": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bottom_error": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "alignment_candidates_json": null,
+        "alignment_mode": "oracle_target_box",
+        "alignment_json": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/experiments/gaussian_direct_same_scene_exact_clip_diverse_384_15000/room_0/generated_alignment_77_02.json"
+      },
+      "source_prior_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/sofa/replica_room_0_obj_77/splat.ply",
+      "canonical_seed_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/sofa/replica_room_0_obj_77/canonical_seed_floor.ply",
+      "requested_point_keep_ratio": 1.0,
+      "original_point_count": 25000,
+      "applied_point_keep_ratio": 1.0,
+      "kept_point_count": 25000
+    },
+    {
+      "source_prior": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/chair/replica_room_0_obj_74/splat.ply",
+      "aligned_prior": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_same_scene_exact_clip_diverse_384_15000/room_0/prior_init/aligned_prior_03.ply",
+      "asset_format": "gaussian",
+      "alignment": {
+        "scale": [
+          0.996003270149231,
+          1.0008580684661865,
+          0.9985958337783813
+        ],
+        "rotation_matrix": [
+          [
+            0.9991415739059448,
+            -0.04126449301838875,
+            -0.003646824276074767
+          ],
+          [
+            0.04125361889600754,
+            0.9991441965103149,
+            -0.003008383559063077
+          ],
+          [
+            0.003767842659726739,
+            0.0028553565498441458,
+            0.999988853931427
+          ]
+        ],
+        "translation": [
+          5.711150169372559,
+          0.27413856983184814,
+          -1.5065457820892334
+        ]
+      },
+      "prior_object_id": "replica_room_0_obj_74",
+      "prior_score": 1.0,
+      "normalized_confidence": 1.0,
+      "point_keep_ratio": 1.0,
+      "dropped": false,
+      "drop_reason": null,
+      "target_object_id": 74,
+      "target_category": "chair",
+      "alignment_debug": {
+        "target_category": "chair",
+        "target_object_id": 74,
+        "target_center": [
+          5.709177494049072,
+          0.2725111246109009,
+          -0.9655821323394775
+        ],
+        "target_sizes": [
+          0.8969669342041016,
+          0.8423287868499756,
+          1.0819392204284668
+        ],
+        "target_rotation_matrix": [
+          [
+            0.9991415739059448,
+            -0.04126449301838875,
+            -0.003646824276074767
+          ],
+          [
+            0.04125361889600754,
+            0.9991441965103149,
+            -0.003008383559063077
+          ],
+          [
+            0.003767842659726739,
+            0.0028553565498441458,
+            0.999988853931427
+          ]
+        ],
+        "target_bottom_anchor": [
+          5.711150169372559,
+          0.27413856983184814,
+          -1.5065457820892334
+        ],
+        "source_prior_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/chair/replica_room_0_obj_74/splat.ply",
+        "canonical_seed_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/chair/replica_room_0_obj_74/canonical_seed_floor.ply",
+        "prior_object_id": "replica_room_0_obj_74",
+        "prior_category": "chair",
+        "support_type": "floor",
+        "anchor_mode": "floor",
+        "scale_mode": "anisotropic",
+        "yaw_deg": 0.0,
+        "scale_vec": [
+          0.996003270149231,
+          1.0008580684661865,
+          0.9985958337783813
+        ],
+        "candidate_center_world": [
+          5.709177494049072,
+          0.2725111246109009,
+          -0.9655821323394775
+        ],
+        "candidate_sizes_world": [
+          0.8969669342041016,
+          0.8423287868499756,
+          1.0819392204284668
+        ],
+        "candidate_aabb_min": [
+          5.241726875305176,
+          -0.16842183470726013,
+          -1.5094380378723145
+        ],
+        "candidate_aabb_max": [
+          6.176628112792969,
+          0.7134441137313843,
+          -0.42172616720199585
+        ],
+        "outside_scene_ratio": 0.0,
+        "non_target_penetration_ratio": 0.0,
+        "other_target_max_iou": 0.0,
+        "prior_target_max_iou": 0.0,
+        "accepted": true,
+        "rejected_reasons": [],
+        "dropped": false,
+        "drop_reason": null,
+        "candidate_count": 1,
+        "fallback_used": false,
+        "feature_backend": "clip",
+        "center_error": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bottom_error": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "alignment_candidates_json": null,
+        "alignment_mode": "oracle_target_box",
+        "alignment_json": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/experiments/gaussian_direct_same_scene_exact_clip_diverse_384_15000/room_0/generated_alignment_74_03.json"
+      },
+      "source_prior_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/chair/replica_room_0_obj_74/splat.ply",
+      "canonical_seed_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/chair/replica_room_0_obj_74/canonical_seed_floor.ply",
+      "requested_point_keep_ratio": 1.0,
+      "original_point_count": 25000,
+      "applied_point_keep_ratio": 1.0,
+      "kept_point_count": 25000
+    }
+  ],
+  "init_mode": "merge"
+}

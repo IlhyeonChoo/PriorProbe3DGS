@@ -1,0 +1,37 @@
+{
+  "support_type": "floor",
+  "up_axis": "z",
+  "bbox_min": [
+    2.4819371700286865,
+    -4.982568264007568,
+    -0.012463065795600414
+  ],
+  "bbox_max": [
+    3.391261339187622,
+    -2.4270684719085693,
+    1.3885308504104614
+  ],
+  "bbox_center": [
+    2.9365992546081543,
+    -3.7048182487487793,
+    0.6880338788032532
+  ],
+  "bbox_size": [
+    0.9093241691589355,
+    2.555499792098999,
+    1.4009939432144165
+  ],
+  "anchor_center": [
+    2.9365992546081543,
+    -3.7048182487487793,
+    0.6880338788032532
+  ],
+  "anchor_bottom_center": [
+    2.9365992546081543,
+    -3.7048182487487793,
+    -0.012463065795600414
+  ],
+  "canonical_seed_center_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/lamp/replica_room_0_obj_6/canonical_seed_center.ply",
+  "canonical_seed_floor_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/lamp/replica_room_0_obj_6/canonical_seed_floor.ply",
+  "default_anchor_mode": "floor"
+}

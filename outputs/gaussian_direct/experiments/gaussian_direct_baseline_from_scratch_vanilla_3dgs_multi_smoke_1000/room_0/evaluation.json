@@ -1,0 +1,62 @@
+{
+  "experiment_name": "gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000",
+  "backend": "vanilla_3dgs",
+  "initialization": "from_scratch",
+  "status": "completed",
+  "dataset_name": "replica",
+  "scene_id": "room_0",
+  "model_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/room_0",
+  "total_optimization_time_sec": 14.045391818974167,
+  "time_to_target_quality_sec": null,
+  "target_psnr": null,
+  "final_iteration": 1000,
+  "psnr": 11.848213195800781,
+  "ssim": 0.4456644058227539,
+  "lpips": 0.4717945158481598,
+  "retrieval_accuracy": null,
+  "alignment_success_rate": null,
+  "gaussian_count": 165558,
+  "prior_object_id": null,
+  "prior_category": null,
+  "prior_object_ids": [],
+  "prior_count": 0,
+  "checkpoint_metrics": [
+    {
+      "iteration": 0,
+      "method": "ours_0",
+      "psnr": 10.529029846191406,
+      "ssim": 0.2272655963897705,
+      "lpips": 0.6922869682312012,
+      "gaussian_count": 100000,
+      "estimated_elapsed_sec": 0.0
+    },
+    {
+      "iteration": 250,
+      "method": "ours_250",
+      "psnr": 10.749495506286621,
+      "ssim": 0.2898627817630768,
+      "lpips": 0.6380545496940613,
+      "gaussian_count": 100000,
+      "estimated_elapsed_sec": 3.511348
+    },
+    {
+      "iteration": 500,
+      "method": "ours_500",
+      "psnr": 11.052201271057129,
+      "ssim": 0.33522680401802063,
+      "lpips": 0.5961750149726868,
+      "gaussian_count": 100000,
+      "estimated_elapsed_sec": 7.022696
+    },
+    {
+      "iteration": 1000,
+      "method": "ours_1000",
+      "psnr": 11.848213195800781,
+      "ssim": 0.4456644058227539,
+      "lpips": 0.4717945158481598,
+      "gaussian_count": 165558,
+      "estimated_elapsed_sec": 14.045392
+    }
+  ],
+  "warnings": []
+}

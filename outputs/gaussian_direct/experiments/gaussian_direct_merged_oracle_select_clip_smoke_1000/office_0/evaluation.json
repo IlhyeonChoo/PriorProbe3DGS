@@ -1,0 +1,67 @@
+{
+  "experiment_name": "gaussian_direct_merged_oracle_select_clip_smoke_1000",
+  "backend": "vanilla_3dgs",
+  "initialization": "prior",
+  "status": "completed",
+  "dataset_name": "replica",
+  "scene_id": "office_0",
+  "model_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_merged_oracle_select_clip_smoke_1000/office_0",
+  "total_optimization_time_sec": 19.52227915264666,
+  "time_to_target_quality_sec": null,
+  "target_psnr": null,
+  "final_iteration": 1000,
+  "psnr": 11.842310905456543,
+  "ssim": 0.44489786028862,
+  "lpips": 0.4624786674976349,
+  "retrieval_accuracy": 1.0,
+  "alignment_success_rate": null,
+  "gaussian_count": 295276,
+  "prior_object_id": "replica_office_0_obj_9",
+  "prior_category": "sofa",
+  "prior_object_ids": [
+    "replica_office_0_obj_9",
+    "replica_office_0_obj_7",
+    "replica_office_0_obj_58",
+    "replica_office_0_obj_61"
+  ],
+  "prior_count": 4,
+  "checkpoint_metrics": [
+    {
+      "iteration": 0,
+      "method": "ours_0",
+      "psnr": 7.65574836730957,
+      "ssim": 0.05559545010328293,
+      "lpips": 0.7656594514846802,
+      "gaussian_count": 200000,
+      "estimated_elapsed_sec": 0.0
+    },
+    {
+      "iteration": 250,
+      "method": "ours_250",
+      "psnr": 10.450024604797363,
+      "ssim": 0.21502137184143066,
+      "lpips": 0.6789365410804749,
+      "gaussian_count": 200000,
+      "estimated_elapsed_sec": 4.88057
+    },
+    {
+      "iteration": 500,
+      "method": "ours_500",
+      "psnr": 10.83055591583252,
+      "ssim": 0.2961830198764801,
+      "lpips": 0.6208742260932922,
+      "gaussian_count": 200000,
+      "estimated_elapsed_sec": 9.76114
+    },
+    {
+      "iteration": 1000,
+      "method": "ours_1000",
+      "psnr": 11.842310905456543,
+      "ssim": 0.44489786028862,
+      "lpips": 0.4624786674976349,
+      "gaussian_count": 295276,
+      "estimated_elapsed_sec": 19.522279
+    }
+  ],
+  "warnings": []
+}

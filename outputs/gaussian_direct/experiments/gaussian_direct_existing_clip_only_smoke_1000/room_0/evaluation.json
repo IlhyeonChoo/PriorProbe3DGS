@@ -1,0 +1,67 @@
+{
+  "experiment_name": "gaussian_direct_existing_clip_only_smoke_1000",
+  "backend": "vanilla_3dgs",
+  "initialization": "prior",
+  "status": "completed",
+  "dataset_name": "replica",
+  "scene_id": "room_0",
+  "model_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_existing_clip_only_smoke_1000/room_0",
+  "total_optimization_time_sec": 21.03445537900552,
+  "time_to_target_quality_sec": null,
+  "target_psnr": null,
+  "final_iteration": 1000,
+  "psnr": 11.883896827697754,
+  "ssim": 0.44419804215431213,
+  "lpips": 0.475816935300827,
+  "retrieval_accuracy": 1.0,
+  "alignment_success_rate": null,
+  "gaussian_count": 288076,
+  "prior_object_id": "chair_0001",
+  "prior_category": "chair",
+  "prior_object_ids": [
+    "chair_0001",
+    "chair_0001",
+    "chair_0001",
+    "chair_0001"
+  ],
+  "prior_count": 4,
+  "checkpoint_metrics": [
+    {
+      "iteration": 0,
+      "method": "ours_0",
+      "psnr": 9.206137657165527,
+      "ssim": 0.11696428060531616,
+      "lpips": 0.7464737892150879,
+      "gaussian_count": 223392,
+      "estimated_elapsed_sec": 0.0
+    },
+    {
+      "iteration": 250,
+      "method": "ours_250",
+      "psnr": 10.749773979187012,
+      "ssim": 0.2876370847225189,
+      "lpips": 0.6387145519256592,
+      "gaussian_count": 223392,
+      "estimated_elapsed_sec": 5.258614
+    },
+    {
+      "iteration": 500,
+      "method": "ours_500",
+      "psnr": 11.058731079101562,
+      "ssim": 0.3333132565021515,
+      "lpips": 0.5975733399391174,
+      "gaussian_count": 223392,
+      "estimated_elapsed_sec": 10.517228
+    },
+    {
+      "iteration": 1000,
+      "method": "ours_1000",
+      "psnr": 11.883896827697754,
+      "ssim": 0.44419804215431213,
+      "lpips": 0.475816935300827,
+      "gaussian_count": 288076,
+      "estimated_elapsed_sec": 21.034455
+    }
+  ],
+  "warnings": []
+}

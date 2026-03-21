@@ -1,0 +1,62 @@
+{
+  "experiment_name": "gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000",
+  "backend": "vanilla_3dgs",
+  "initialization": "from_scratch",
+  "status": "completed",
+  "dataset_name": "replica",
+  "scene_id": "office_0",
+  "model_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_smoke_1000/office_0",
+  "total_optimization_time_sec": 14.829993594903499,
+  "time_to_target_quality_sec": null,
+  "target_psnr": null,
+  "final_iteration": 1000,
+  "psnr": 11.614513397216797,
+  "ssim": 0.39769378304481506,
+  "lpips": 0.5135638117790222,
+  "retrieval_accuracy": null,
+  "alignment_success_rate": null,
+  "gaussian_count": 183173,
+  "prior_object_id": null,
+  "prior_category": null,
+  "prior_object_ids": [],
+  "prior_count": 0,
+  "checkpoint_metrics": [
+    {
+      "iteration": 0,
+      "method": "ours_0",
+      "psnr": 8.135271072387695,
+      "ssim": 0.056459102779626846,
+      "lpips": 0.7670942544937134,
+      "gaussian_count": 100000,
+      "estimated_elapsed_sec": 0.0
+    },
+    {
+      "iteration": 250,
+      "method": "ours_250",
+      "psnr": 10.390324592590332,
+      "ssim": 0.19364671409130096,
+      "lpips": 0.7061358094215393,
+      "gaussian_count": 100000,
+      "estimated_elapsed_sec": 3.707498
+    },
+    {
+      "iteration": 500,
+      "method": "ours_500",
+      "psnr": 10.671425819396973,
+      "ssim": 0.26101773977279663,
+      "lpips": 0.663524329662323,
+      "gaussian_count": 100000,
+      "estimated_elapsed_sec": 7.414997
+    },
+    {
+      "iteration": 1000,
+      "method": "ours_1000",
+      "psnr": 11.614513397216797,
+      "ssim": 0.39769378304481506,
+      "lpips": 0.5135638117790222,
+      "gaussian_count": 183173,
+      "estimated_elapsed_sec": 14.829994
+    }
+  ],
+  "warnings": []
+}

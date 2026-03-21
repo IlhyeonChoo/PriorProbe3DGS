@@ -1,0 +1,37 @@
+{
+  "support_type": "floor",
+  "up_axis": "z",
+  "bbox_min": [
+    -0.6385125517845154,
+    1.1421645879745483,
+    -0.0008641566382721066
+  ],
+  "bbox_max": [
+    0.470218688249588,
+    2.996701955795288,
+    0.7131989002227783
+  ],
+  "bbox_center": [
+    -0.08414693176746368,
+    2.0694332122802734,
+    0.35616737604141235
+  ],
+  "bbox_size": [
+    1.1087312698364258,
+    1.8545373678207397,
+    0.7140630483627319
+  ],
+  "anchor_center": [
+    -0.08414693176746368,
+    2.0694332122802734,
+    0.35616737604141235
+  ],
+  "anchor_bottom_center": [
+    -0.08414693176746368,
+    2.0694332122802734,
+    -0.0008641566382721066
+  ],
+  "canonical_seed_center_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/sofa/replica_office_0_obj_7/canonical_seed_center.ply",
+  "canonical_seed_floor_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/replica_target_exact_clip/assets/sofa/replica_office_0_obj_7/canonical_seed_floor.ply",
+  "default_anchor_mode": "floor"
+}

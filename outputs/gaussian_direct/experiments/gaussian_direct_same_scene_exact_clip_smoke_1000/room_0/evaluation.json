@@ -1,0 +1,67 @@
+{
+  "experiment_name": "gaussian_direct_same_scene_exact_clip_smoke_1000",
+  "backend": "vanilla_3dgs",
+  "initialization": "prior",
+  "status": "completed",
+  "dataset_name": "replica",
+  "scene_id": "room_0",
+  "model_path": "/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/backend_runs/gaussian_direct_same_scene_exact_clip_smoke_1000/room_0",
+  "total_optimization_time_sec": 19.032473881728947,
+  "time_to_target_quality_sec": null,
+  "target_psnr": null,
+  "final_iteration": 1000,
+  "psnr": 12.001121520996094,
+  "ssim": 0.47203895449638367,
+  "lpips": 0.44187629222869873,
+  "retrieval_accuracy": 1.0,
+  "alignment_success_rate": null,
+  "gaussian_count": 276349,
+  "prior_object_id": "replica_room_0_obj_6",
+  "prior_category": "lamp",
+  "prior_object_ids": [
+    "replica_room_0_obj_6",
+    "replica_room_0_obj_9",
+    "replica_room_0_obj_77",
+    "replica_room_0_obj_74"
+  ],
+  "prior_count": 4,
+  "checkpoint_metrics": [
+    {
+      "iteration": 0,
+      "method": "ours_0",
+      "psnr": 10.453054428100586,
+      "ssim": 0.227528378367424,
+      "lpips": 0.6811506152153015,
+      "gaussian_count": 200000,
+      "estimated_elapsed_sec": 0.0
+    },
+    {
+      "iteration": 250,
+      "method": "ours_250",
+      "psnr": 10.808672904968262,
+      "ssim": 0.3087497353553772,
+      "lpips": 0.6114104390144348,
+      "gaussian_count": 200000,
+      "estimated_elapsed_sec": 4.758118
+    },
+    {
+      "iteration": 500,
+      "method": "ours_500",
+      "psnr": 11.12240219116211,
+      "ssim": 0.35814300179481506,
+      "lpips": 0.5678867101669312,
+      "gaussian_count": 200000,
+      "estimated_elapsed_sec": 9.516237
+    },
+    {
+      "iteration": 1000,
+      "method": "ours_1000",
+      "psnr": 12.001121520996094,
+      "ssim": 0.47203895449638367,
+      "lpips": 0.44187629222869873,
+      "gaussian_count": 276349,
+      "estimated_elapsed_sec": 19.032474
+    }
+  ],
+  "warnings": []
+}
