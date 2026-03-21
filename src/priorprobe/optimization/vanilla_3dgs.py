@@ -45,6 +45,10 @@ class Vanilla3DGSBackendConfig:
     quiet: bool = False
     dry_run: bool = False
     init_mode: str = "merge"
+    prior_protection_mode: str = "none"
+    prior_lr_scale: float = 0.05
+    protect_prior_from_prune: bool = True
+    protect_prior_from_densify: bool = True
     save_initial_snapshot: bool = False
     initial_render_sets: tuple[str, ...] = ()
     extra_args: tuple[str, ...] = ()
@@ -109,6 +113,10 @@ class Vanilla3DGSBackendConfig:
             quiet=bool(payload.get("quiet", False)),
             dry_run=dry_run,
             init_mode=str(payload.get("init_mode", "merge")),
+            prior_protection_mode=str(payload.get("prior_protection_mode", "none")),
+            prior_lr_scale=float(payload.get("prior_lr_scale", 0.05)),
+            protect_prior_from_prune=bool(payload.get("protect_prior_from_prune", True)),
+            protect_prior_from_densify=bool(payload.get("protect_prior_from_densify", True)),
             save_initial_snapshot=bool(artifacts_payload.get("save_initial_snapshot", False)),
             initial_render_sets=_as_str_tuple(artifacts_payload.get("initial_render_sets")),
             extra_args=_as_str_tuple(payload.get("extra_args")),
@@ -182,6 +190,19 @@ def build_train_command(
         command.extend(["--init-mode", config.init_mode])
     elif prior_spec_json is not None:
         command.extend(["--init-mode", config.init_mode])
+    if prior_ply is not None or prior_spec_json is not None:
+        command.extend(["--prior-protection-mode", config.prior_protection_mode])
+        command.extend(["--prior-lr-scale", str(config.prior_lr_scale)])
+        command.append(
+            "--protect-prior-from-prune"
+            if config.protect_prior_from_prune
+            else "--no-protect-prior-from-prune"
+        )
+        command.append(
+            "--protect-prior-from-densify"
+            if config.protect_prior_from_densify
+            else "--no-protect-prior-from-densify"
+        )
     if alignment_json is not None:
         command.extend(["--alignment-json", str(alignment_json)])
     if prior_object_id is not None:

@@ -121,6 +121,12 @@ def test_build_prior_library_includes_asset_metadata_extras(tmp_path: Path) -> N
                     "render_dir": str(render_dir.relative_to(tmp_path / "project")),
                     "feature_path": str(feature_path.relative_to(tmp_path / "project")),
                     "source_split": "shapenet_chair",
+                    "metadata_extras": {
+                        "source_domain": "replica",
+                        "replica_scene_id": "room_0",
+                        "replica_object_id": 6,
+                        "exact_match_key": "room_0:6",
+                    },
                 }
             ],
         },
@@ -135,6 +141,7 @@ def test_build_prior_library_includes_asset_metadata_extras(tmp_path: Path) -> N
     assert payload["entries"][0]["metadata"]["extras"]["render_count"] == 2
     assert payload["entries"][0]["metadata"]["extras"]["feature_dim"] == 4
     assert payload["entries"][0]["metadata"]["extras"]["support_type"] == "floor"
+    assert payload["entries"][0]["metadata"]["extras"]["exact_match_key"] == "room_0:6"
     assert payload["entries"][0]["metadata"]["extras"]["canonical_seed_floor_path"].endswith(
         "canonical_seed_floor.ply"
     )

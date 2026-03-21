@@ -11,7 +11,14 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from priorprobe.replica_export import CameraFrame, select_largest_target, select_top_targets, write_colmap_text_scene
+from priorprobe.replica_export import (
+    CameraFrame,
+    accepted_azimuth_histogram,
+    select_largest_target,
+    select_multi_object_candidate_infos,
+    select_top_targets,
+    write_colmap_text_scene,
+)
 
 
 def test_select_largest_target_picks_largest_category_instance(tmp_path: Path) -> None:
@@ -137,3 +144,51 @@ def test_select_top_targets_filters_categories_and_limits_count(tmp_path: Path) 
 
     assert [target.category for target in targets] == ["sofa", "table"]
     assert [target.object_id for target in targets] == [9, 11]
+
+
+def test_select_multi_object_candidate_infos_diverse_azimuth_spreads_views() -> None:
+    focus_center = np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
+    candidate_infos = []
+    # Create many high-score candidates from bin 0 and lower-score candidates from other bins.
+    for index, position in enumerate(
+        [
+            [2.0, 0.0, 0.0],
+            [1.8, 0.2, 0.0],
+            [1.7, -0.1, 0.0],
+            [0.0, 2.0, 0.0],
+            [-2.0, 0.0, 0.0],
+            [0.0, -2.0, 0.0],
+        ]
+    ):
+        candidate_infos.append(
+            {
+                "position": np.asarray(position, dtype=np.float32),
+                "rotation": np.eye(3, dtype=np.float32),
+                "visible_ratios": {9: 0.01 if index else 0.05},
+                "union_visible_ratio": [0.95, 0.92, 0.90, 0.40, 0.35, 0.30][index],
+            }
+        )
+
+    selected = select_multi_object_candidate_infos(
+        candidate_infos,
+        total_views=4,
+        target_ids=[9],
+        focus_center=focus_center,
+        selection_mode="diverse_azimuth",
+        azimuth_bin_count=4,
+    )
+
+    frames = [
+        CameraFrame(
+            image_name=f"{index:05d}.png",
+            position=np.asarray(item["position"], dtype=np.float32),
+            rotation_cam2world=np.asarray(item["rotation"], dtype=np.float32),
+            visible_ratio=float(item["union_visible_ratio"]),
+            split="train",
+        )
+        for index, item in enumerate(selected)
+    ]
+    histogram = accepted_azimuth_histogram(frames, focus_center, bin_count=4)
+
+    assert len(selected) == 4
+    assert sum(1 for count in histogram if count > 0) >= 3

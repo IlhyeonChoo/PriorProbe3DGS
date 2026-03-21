@@ -21,6 +21,7 @@ from priorprobe.datasets import load_dataset_spec, resolve_dataset_scene, valida
 from priorprobe.evaluation.metrics import summarize_backend_run, summarize_run
 from priorprobe.insertion.alignment_search import (
     TargetBox,
+    aabb_from_obb,
     build_scene_points_in_any_target_mask,
     choose_alignment_candidate,
     default_anchor_mode,
@@ -348,6 +349,112 @@ def _build_alignment_payload(
     }
 
 
+def _exact_match_key_from_target(target_payload: dict[str, Any]) -> str:
+    return f"{target_payload.get('scene_id')}:{target_payload.get('object_id')}"
+
+
+def _build_oracle_target_box_alignment_payload(
+    *,
+    target_payload: dict[str, Any],
+    selected_prior: RetrievalResult,
+    canonical_seed_path: Path,
+    source_prior_path: Path,
+    prior_bbox_size: np.ndarray,
+    anchor_mode: str,
+    support_type: str,
+    feature_backend: str,
+) -> dict[str, Any]:
+    target_box = TargetBox.from_payload(target_payload)
+    scale_vec = target_box.sizes / np.maximum(np.asarray(prior_bbox_size, dtype=np.float32), 1e-6)
+    if not np.all(np.isfinite(scale_vec)) or np.any(scale_vec <= 0.0):
+        raise SystemExit(f"Invalid oracle_target_box scale vector for prior {selected_prior.object_id}: {scale_vec}")
+
+    rotation_matrix = target_box.rotation_matrix.astype(np.float32)
+    translation = target_box.anchor_point(anchor_mode).astype(np.float32)
+    target_bottom = target_box.anchor_point("floor").astype(np.float32)
+    candidate_aabb_min, candidate_aabb_max = aabb_from_obb(
+        center=target_box.center,
+        sizes=target_box.sizes,
+        rotation_matrix=target_box.rotation_matrix,
+    )
+
+    return {
+        "scale": scale_vec.tolist(),
+        "rotation_matrix": rotation_matrix.tolist(),
+        "translation": translation.tolist(),
+        "metadata": {
+            "target_category": target_payload.get("category"),
+            "target_object_id": target_payload.get("object_id"),
+            "target_center": target_box.center.tolist(),
+            "target_sizes": target_box.sizes.tolist(),
+            "target_rotation_matrix": target_box.rotation_matrix.tolist(),
+            "target_bottom_anchor": target_bottom.tolist(),
+            "source_prior_path": str(source_prior_path),
+            "canonical_seed_path": str(canonical_seed_path),
+            "prior_object_id": selected_prior.object_id,
+            "prior_category": selected_prior.category,
+            "support_type": support_type,
+            "anchor_mode": anchor_mode,
+            "scale_mode": "anisotropic",
+            "yaw_deg": 0.0,
+            "scale_vec": scale_vec.tolist(),
+            "candidate_center_world": target_box.center.tolist(),
+            "candidate_sizes_world": target_box.sizes.tolist(),
+            "candidate_aabb_min": candidate_aabb_min.tolist(),
+            "candidate_aabb_max": candidate_aabb_max.tolist(),
+            "outside_scene_ratio": 0.0,
+            "non_target_penetration_ratio": 0.0,
+            "other_target_max_iou": 0.0,
+            "prior_target_max_iou": 0.0,
+            "accepted": True,
+            "rejected_reasons": [],
+            "dropped": False,
+            "drop_reason": None,
+            "candidate_count": 1,
+            "fallback_used": False,
+            "feature_backend": feature_backend,
+            "center_error": [0.0, 0.0, 0.0],
+            "bottom_error": [0.0, 0.0, 0.0],
+            "alignment_candidates_json": None,
+            "alignment_mode": "oracle_target_box",
+        },
+    }
+
+
+def _select_exact_target_prior(
+    library: PriorLibrary,
+    *,
+    target_payload: dict[str, Any],
+) -> RetrievalResult:
+    expected_key = _exact_match_key_from_target(target_payload)
+    expected_scene = str(target_payload.get("scene_id"))
+    expected_object = str(target_payload.get("object_id"))
+
+    for entry in library.list_entries():
+        extras = dict(entry.metadata.extras) if entry.metadata is not None else {}
+        candidate_key = extras.get("exact_match_key")
+        candidate_scene = str(extras.get("replica_scene_id")) if extras.get("replica_scene_id") is not None else None
+        candidate_object = str(extras.get("replica_object_id")) if extras.get("replica_object_id") is not None else None
+        if candidate_key == expected_key or (
+            candidate_scene == expected_scene and candidate_object == expected_object
+        ):
+            return RetrievalResult(
+                object_id=entry.object_id,
+                score=1.0,
+                mode="oracle_target_object",
+                gaussian_path=entry.gaussian_path,
+                category=entry.category,
+                candidate_count=1,
+                fallback_used=False,
+                feature_path=entry.feature_path,
+            )
+
+    raise SystemExit(
+        "oracle_target_object retrieval could not find an exact prior for "
+        f"scene_id={expected_scene}, object_id={expected_object}"
+    )
+
+
 def build_insertion_controls(selected_priors: list[RetrievalResult], *, init_mode: str) -> list[dict[str, Any]]:
     if not selected_priors:
         return []
@@ -513,11 +620,14 @@ def select_priors(
     retriever = PriorRetriever(library)
     retrieval_mode = str(experiment.get("retrieval_mode", "automatic"))
     feature_backend = str(experiment.get("feature_backend", "mean_rgb"))
-    if retrieval_mode in {"oracle", "oracle_category"}:
+    if retrieval_mode in {"oracle", "oracle_category", "oracle_target_object"}:
         if dataset_scene is None or not target_payloads:
             raise SystemExit("oracle retrieval requires a dataset scene with oracle target metadata.")
     results: list[RetrievalResult] = []
     for target_payload in target_payloads or []:
+        if retrieval_mode == "oracle_target_object":
+            results.append(_select_exact_target_prior(library, target_payload=target_payload))
+            continue
         oracle_category = None
         query_feature = None
         if retrieval_mode in {"oracle", "oracle_category"}:
@@ -546,6 +656,10 @@ def select_priors(
 def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace) -> int:
     experiment = config["experiment"]
     trainer_config = config.get("trainer", {})
+    alignment_mode = str(experiment.get("alignment_mode", "automatic"))
+    insertion_representation = str(experiment.get("insertion_representation", "pointcloud_proxy"))
+    if insertion_representation not in {"pointcloud_proxy", "gaussian_direct"}:
+        raise SystemExit(f"Unsupported insertion_representation: {insertion_representation}")
     outputs_root = resolve_outputs_root(args.outputs_dir)
     dataset_scene = load_dataset_scene(
         config,
@@ -574,6 +688,14 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
         model_override=resolve_override(args.backend_model_path),
         dry_run_override=True if args.dry_run else None,
     )
+    if (
+        experiment["initialization"] != "from_scratch"
+        and insertion_representation == "gaussian_direct"
+        and backend_config.init_mode not in {"merge", "replace"}
+    ):
+        raise SystemExit(
+            "gaussian_direct prior insertion currently supports backend.init_mode in {'merge', 'replace'} only."
+        )
 
     output_dir = experiment_output_dir(
         experiment["name"],
@@ -639,15 +761,18 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
             raise SystemExit("explicit alignment_transform_path only supports single-prior experiments")
 
         target_boxes = [TargetBox.from_payload(item) for item in target_payloads]
-        scene_points = _load_scene_sparse_points(
-            dataset_scene.source_path,
-            max_points=alignment_settings["max_scene_points"],
-        )
-        scene_points_in_any_target = build_scene_points_in_any_target_mask(
-            scene_points,
-            target_boxes,
-            margin_factor=alignment_settings["target_obb_margin"],
-        )
+        scene_points: np.ndarray | None = None
+        scene_points_in_any_target: np.ndarray | None = None
+        if alignment_path is None and alignment_mode != "oracle_target_box":
+            scene_points = _load_scene_sparse_points(
+                dataset_scene.source_path,
+                max_points=alignment_settings["max_scene_points"],
+            )
+            scene_points_in_any_target = build_scene_points_in_any_target_mask(
+                scene_points,
+                target_boxes,
+                margin_factor=alignment_settings["target_obb_margin"],
+            )
         previous_candidate_aabbs: list[tuple[np.ndarray, np.ndarray]] = []
         feature_backend = str(experiment.get("feature_backend", "mean_rgb"))
 
@@ -662,6 +787,10 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
                 library,
                 selected_item,
                 anchor_mode=alignment_settings["anchor_mode"],
+            )
+            prior_entry = library.get(selected_item.object_id)
+            prior_metadata_extras = (
+                dict(prior_entry.metadata.extras) if prior_entry.metadata is not None else {}
             )
             support_type = support_type_for_category(
                 selected_item.category,
@@ -691,7 +820,38 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
                     "alignment_json": str(alignment_path),
                     "support_type": support_type,
                 }
+            elif alignment_mode == "oracle_target_box":
+                alignment_payload = _build_oracle_target_box_alignment_payload(
+                    target_payload=target_item,
+                    selected_prior=selected_item,
+                    canonical_seed_path=canonical_seed_path,
+                    source_prior_path=source_prior_path,
+                    prior_bbox_size=np.asarray(canonical_metadata["bbox_size"], dtype=np.float32),
+                    anchor_mode=resolved_anchor_mode,
+                    support_type=support_type,
+                    feature_backend=feature_backend,
+                )
+                chosen_alignment_path = output_dir / (
+                    f"generated_alignment_{target_item['object_id']}_{index:02d}.json"
+                )
+                chosen_alignment_path.write_text(json.dumps(alignment_payload, indent=2), encoding="utf-8")
+                generated_alignment_payloads.append(alignment_payload)
+                generated_alignment_candidates.append(
+                    {
+                        "target_object_id": target_item.get("object_id"),
+                        "target_category": target_item.get("category"),
+                        "prior_object_id": selected_item.object_id,
+                        "path": str(chosen_alignment_path),
+                        "mode": "oracle_target_box",
+                    }
+                )
+                alignment_debug = dict(alignment_payload.get("metadata", {}))
+                alignment_debug["alignment_json"] = str(chosen_alignment_path)
+                effective_dropped = bool(insertion_controls[index]["dropped"])
+                effective_drop_reason = "filtered_confidence" if effective_dropped else None
             else:
+                if scene_points is None or scene_points_in_any_target is None:
+                    raise SystemExit("alignment search requires scene sparse points.")
                 candidates_output = output_dir / (
                     f"alignment_candidates_{target_item['object_id']}_{index:02d}.json"
                 )
@@ -782,8 +942,10 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
             if effective_dropped:
                 requested_keep_ratio = 0.0
 
+            insertion_source_path = source_prior_path if insertion_representation == "gaussian_direct" else canonical_seed_path
+
             prior_spec = {
-                "prior_ply": str(canonical_seed_path),
+                "prior_ply": str(insertion_source_path),
                 "alignment_json": str(chosen_alignment_path),
                 "prior_object_id": selected_item.object_id,
                 "prior_score": insertion_controls[index]["prior_score"],
@@ -796,6 +958,9 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
                 "alignment_debug": alignment_debug,
                 "source_prior_path": str(source_prior_path),
                 "canonical_seed_path": str(canonical_seed_path),
+                "insertion_source_path": str(insertion_source_path),
+                "insertion_representation": insertion_representation,
+                "metadata_extras": prior_metadata_extras,
             }
             prior_specs_payload.append(prior_spec)
             selected_prior_metadata_payloads.append(
@@ -803,6 +968,7 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
                     "object_id": selected_item.object_id,
                     "score": selected_item.score,
                     "mode": selected_item.mode,
+                    "asset_format": "gaussian" if insertion_representation == "gaussian_direct" else "point_cloud",
                     "gaussian_path": str(source_prior_path),
                     "category": selected_item.category,
                     "feature_path": str(selected_item.feature_path) if selected_item.feature_path else None,
@@ -816,6 +982,9 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
                     "drop_reason": effective_drop_reason,
                     "source_prior_path": str(source_prior_path),
                     "canonical_seed_path": str(canonical_seed_path),
+                    "insertion_source_path": str(insertion_source_path),
+                    "insertion_representation": insertion_representation,
+                    "metadata_extras": prior_metadata_extras,
                     "alignment_json": str(chosen_alignment_path),
                     "alignment_debug": alignment_debug,
                 }
@@ -850,6 +1019,14 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
         "experiment_name": experiment["name"],
         "backend": "vanilla_3dgs",
         "initialization": experiment["initialization"],
+        "alignment_mode": alignment_mode,
+        "insertion_representation": insertion_representation,
+        "prior_protection": {
+            "mode": backend_config.prior_protection_mode,
+            "lr_scale": backend_config.prior_lr_scale,
+            "protect_from_prune": backend_config.protect_prior_from_prune,
+            "protect_from_densify": backend_config.protect_prior_from_densify,
+        },
         "status": "dry_run" if backend_config.dry_run else "pending",
         "repo_path": str(backend_config.repo_path),
         "source_path": str(backend_config.source_path),
@@ -911,6 +1088,7 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
                 "normalized_confidence": insertion_controls[0]["normalized_confidence"] if insertion_controls else None,
                 "point_keep_ratio": insertion_controls[0]["point_keep_ratio"] if insertion_controls else None,
                 "dropped": insertion_controls[0]["dropped"] if insertion_controls else None,
+                "insertion_representation": insertion_representation,
             }
         )
         metadata["selected_prior"] = {
@@ -927,6 +1105,7 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
                 "object_id": item.object_id,
                 "score": item.score,
                 "mode": item.mode,
+                "asset_format": "gaussian" if insertion_representation == "gaussian_direct" else "point_cloud",
                 "gaussian_path": str(resolve_path(str(item.gaussian_path))),
                 "category": item.category,
                 "feature_path": str(item.feature_path) if item.feature_path else None,

@@ -72,6 +72,10 @@ def test_build_train_command_with_prior_spec_json(tmp_path: Path) -> None:
         python_executable=tmp_path / "gaussian-splatting" / "venv" / "bin" / "python",
         iterations=789,
         init_mode="weighted_merge",
+        prior_protection_mode="weak",
+        prior_lr_scale=0.02,
+        protect_prior_from_prune=True,
+        protect_prior_from_densify=False,
         save_initial_snapshot=True,
         initial_render_sets=("train", "test"),
     )
@@ -85,6 +89,12 @@ def test_build_train_command_with_prior_spec_json(tmp_path: Path) -> None:
     assert "--prior-spec-json" in command
     assert "--init-mode" in command
     assert "weighted_merge" in command
+    assert "--prior-protection-mode" in command
+    assert "weak" in command
+    assert "--prior-lr-scale" in command
+    assert "0.02" in command
+    assert "--protect-prior-from-prune" in command
+    assert "--no-protect-prior-from-densify" in command
     assert "--save-initial-snapshot" in command
     assert "--initial-render-sets" in command
     assert str(prior_spec_json) in command
@@ -96,6 +106,10 @@ def test_backend_config_from_payload_parses_artifacts(tmp_path: Path) -> None:
             "repo_path": str(tmp_path / "repo"),
             "source_path": str(tmp_path / "scene"),
             "model_path": str(tmp_path / "output"),
+            "prior_protection_mode": "freeze",
+            "prior_lr_scale": 0.01,
+            "protect_prior_from_prune": False,
+            "protect_prior_from_densify": True,
         },
         root=tmp_path,
         trainer_payload={"iterations": 15000},
@@ -108,3 +122,7 @@ def test_backend_config_from_payload_parses_artifacts(tmp_path: Path) -> None:
     assert config.iterations == 15000
     assert config.save_initial_snapshot is True
     assert config.initial_render_sets == ("test",)
+    assert config.prior_protection_mode == "freeze"
+    assert config.prior_lr_scale == 0.01
+    assert config.protect_prior_from_prune is False
+    assert config.protect_prior_from_densify is True

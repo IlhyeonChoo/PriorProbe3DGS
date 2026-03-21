@@ -1,0 +1,44 @@
+experiment:
+  name: gaussian_direct_same_scene_exact_clip_diverse_384_weak_smoke_1000
+  initialization: prior
+  reconstruction_backend: vanilla_3dgs
+  dataset_config: configs/datasets/replica_multi_diverse_dense_384_shared.yaml
+  prior_config: outputs/gaussian_direct/prior_library/replica_target_exact_clip.yaml
+  retrieval_mode: oracle_target_object
+  alignment_mode: oracle_target_box
+  insertion_representation: gaussian_direct
+  adaptation: none
+  prior_object_id: null
+  feature_backend: clip
+
+oracle:
+  categories: [chair, sofa, table, lamp]
+  max_objects: 4
+
+backend:
+  repo_path: ../3DGS/gaussian-splatting
+  python_executable: ../3DGS/gaussian-splatting/venv/bin/python
+  source_path: /path/to/colmap_scene
+  model_path: CHANGE_ME_DATASET_OUTPUT
+  disable_viewer: true
+  quiet: true
+  dry_run: false
+  init_mode: merge
+  prior_protection_mode: weak
+  prior_lr_scale: 0.02
+  protect_prior_from_prune: true
+  protect_prior_from_densify: true
+
+artifacts:
+  save_initial_snapshot: true
+  initial_render_sets: [train, test]
+
+prior_alignment:
+  anchor_mode: auto
+
+trainer:
+  iterations: 1000
+  sh_degree: 3
+  test_iterations: [250, 500, 1000]
+  save_iterations: [250, 500, 1000]
+  checkpoint_iterations: []

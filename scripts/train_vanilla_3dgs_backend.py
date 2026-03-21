@@ -52,6 +52,15 @@ import torch
 import torchvision
 from plyfile import PlyData, PlyElement
 from torch import nn
+from utils.general_utils import build_rotation, inverse_sigmoid
+
+from priorprobe.gaussian_affine import (
+    detect_asset_format,
+    parse_scale,
+    transform_gaussian_vertex,
+    transform_positions,
+)
+from priorprobe.result_ply_naming import ensure_named_point_cloud, infer_experiment_name
 
 train_module = importlib.import_module("train")
 scene_module = importlib.import_module("scene")
@@ -62,6 +71,305 @@ gaussian_renderer_module = importlib.import_module("gaussian_renderer")
 ModelParams = arguments_module.ModelParams
 OptimizationParams = arguments_module.OptimizationParams
 PipelineParams = arguments_module.PipelineParams
+
+
+PRIOR_TENSOR_GROUPS = ("xyz", "f_dc", "f_rest", "opacity", "scaling", "rotation")
+
+
+def normalize_prior_protection_mode(value: str | None) -> str:
+    normalized = str(value or "none").strip().lower()
+    if normalized not in {"none", "freeze", "weak"}:
+        raise ValueError(f"Unsupported prior protection mode: {value!r}")
+    return normalized
+
+
+def build_prior_protection_config(args: argparse.Namespace) -> dict[str, Any]:
+    mode = normalize_prior_protection_mode(getattr(args, "prior_protection_mode", "none"))
+    lr_scale = float(getattr(args, "prior_lr_scale", 0.05))
+    return {
+        "mode": mode,
+        "lr_scale": float(np.clip(lr_scale, 0.0, 1.0)),
+        "protect_from_prune": bool(getattr(args, "protect_prior_from_prune", True)),
+        "protect_from_densify": bool(getattr(args, "protect_prior_from_densify", True)),
+    }
+
+
+def prior_protection_enabled(gaussians) -> bool:
+    config = getattr(gaussians, "_prior_protection_config", None)
+    if not config:
+        return False
+    if normalize_prior_protection_mode(config.get("mode")) == "none":
+        return False
+    mask = getattr(gaussians, "_prior_point_mask", None)
+    return mask is not None and int(mask.numel()) > 0 and bool(mask.any().item())
+
+
+def prior_point_mask(gaussians) -> torch.Tensor | None:
+    if not prior_protection_enabled(gaussians):
+        return None
+    return getattr(gaussians, "_prior_point_mask", None)
+
+
+def prior_lr_scale_for_group(gaussians, group_name: str) -> float:
+    config = getattr(gaussians, "_prior_protection_config", None) or {}
+    mode = normalize_prior_protection_mode(config.get("mode"))
+    if mode == "freeze":
+        return 0.0
+    if mode == "weak":
+        return float(config.get("lr_scale", 0.05))
+    return 1.0
+
+
+def broadcast_prior_mask(mask: torch.Tensor, tensor: torch.Tensor) -> torch.Tensor:
+    view_shape = (mask.shape[0],) + (1,) * max(tensor.dim() - 1, 0)
+    return mask.view(*view_shape)
+
+
+def extend_prior_mask(gaussians, extra_count: int) -> None:
+    if extra_count <= 0:
+        return
+    mask = getattr(gaussians, "_prior_point_mask", None)
+    if mask is None:
+        return
+    extension = torch.zeros((int(extra_count),), dtype=torch.bool, device=mask.device)
+    gaussians._prior_point_mask = torch.cat((mask, extension), dim=0)
+
+
+def prune_prior_mask(gaussians, valid_points_mask: torch.Tensor) -> None:
+    mask = getattr(gaussians, "_prior_point_mask", None)
+    if mask is None:
+        return
+    gaussians._prior_point_mask = mask[valid_points_mask]
+
+
+def configure_prior_protection(gaussians, *, args: argparse.Namespace, selected_priors: list[dict[str, Any]]) -> None:
+    config = build_prior_protection_config(args)
+    total_count = int(gaussians.get_xyz.shape[0])
+    mask = torch.zeros((total_count,), dtype=torch.bool, device="cuda")
+    protected_ranges: list[dict[str, Any]] = []
+    for item in selected_priors:
+        start = item.get("protected_index_start")
+        end = item.get("protected_index_end")
+        if start is None or end is None:
+            continue
+        start_index = int(start)
+        end_index = int(end)
+        if start_index < 0 or end_index <= start_index or end_index > total_count:
+            continue
+        mask[start_index:end_index] = True
+        protected_ranges.append(
+            {
+                "prior_object_id": item.get("prior_object_id"),
+                "target_object_id": item.get("target_object_id"),
+                "asset_format": item.get("asset_format"),
+                "start_index": start_index,
+                "end_index": end_index,
+                "point_count": end_index - start_index,
+            }
+        )
+    gaussians._prior_protection_config = config
+    gaussians._prior_point_mask = mask
+    gaussians._prior_protected_ranges = protected_ranges
+
+
+def save_gaussian_subset_ply(gaussians, *, mask: torch.Tensor, path: Path) -> None:
+    mask_cpu = mask.detach().cpu().numpy().astype(bool, copy=False)
+    if mask_cpu.size == 0 or not bool(mask_cpu.any()):
+        return
+    xyz = gaussians._xyz.detach().cpu().numpy()[mask_cpu]
+    normals = np.zeros_like(xyz)
+    f_dc = gaussians._features_dc.detach().transpose(1, 2).flatten(start_dim=1).contiguous().cpu().numpy()[mask_cpu]
+    f_rest = gaussians._features_rest.detach().transpose(1, 2).flatten(start_dim=1).contiguous().cpu().numpy()[mask_cpu]
+    opacities = gaussians._opacity.detach().cpu().numpy()[mask_cpu]
+    scale = gaussians._scaling.detach().cpu().numpy()[mask_cpu]
+    rotation = gaussians._rotation.detach().cpu().numpy()[mask_cpu]
+
+    dtype_full = [(attribute, "f4") for attribute in gaussians.construct_list_of_attributes()]
+    elements = np.empty(xyz.shape[0], dtype=dtype_full)
+    attributes = np.concatenate((xyz, normals, f_dc, f_rest, opacities, scale, rotation), axis=1)
+    elements[:] = list(map(tuple, attributes))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    PlyData([PlyElement.describe(elements, "vertex")]).write(path)
+
+
+def write_prior_protection_checkpoint(model_path: Path, iteration: int, gaussians) -> None:
+    mask = getattr(gaussians, "_prior_point_mask", None)
+    config = getattr(gaussians, "_prior_protection_config", None)
+    if mask is None or config is None:
+        return
+    point_cloud_path = model_path / "point_cloud" / f"iteration_{iteration}"
+    point_cloud_path.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "iteration": int(iteration),
+        "mode": config.get("mode"),
+        "lr_scale": config.get("lr_scale"),
+        "protect_from_prune": bool(config.get("protect_from_prune", True)),
+        "protect_from_densify": bool(config.get("protect_from_densify", True)),
+        "protected_point_count": int(mask.sum().item()),
+        "total_point_count": int(gaussians.get_xyz.shape[0]),
+        "protected_ranges": list(getattr(gaussians, "_prior_protected_ranges", [])),
+    }
+    (point_cloud_path / "prior_protection.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    save_gaussian_subset_ply(
+        gaussians,
+        mask=mask,
+        path=point_cloud_path / "prior_points.ply",
+    )
+
+
+class PriorProtectedOptimizer:
+    def __init__(self, optimizer, gaussians) -> None:
+        self._optimizer = optimizer
+        self._gaussians = gaussians
+
+    def step(self, *args, **kwargs):
+        mask = prior_point_mask(self._gaussians)
+        if mask is not None:
+            for group in self._optimizer.param_groups:
+                if not group.get("params"):
+                    continue
+                parameter = group["params"][0]
+                grad = parameter.grad
+                if grad is None or int(grad.shape[0]) != int(mask.shape[0]):
+                    continue
+                lr_scale = prior_lr_scale_for_group(self._gaussians, str(group.get("name", "")))
+                if lr_scale >= 0.9999:
+                    continue
+                grad_mask = broadcast_prior_mask(mask, grad)
+                scale_tensor = (~grad_mask).to(dtype=grad.dtype) + grad_mask.to(dtype=grad.dtype) * float(lr_scale)
+                grad.mul_(scale_tensor)
+        return self._optimizer.step(*args, **kwargs)
+
+    def zero_grad(self, *args, **kwargs):
+        return self._optimizer.zero_grad(*args, **kwargs)
+
+    def __getattr__(self, name: str):
+        return getattr(self._optimizer, name)
+
+
+def install_prior_protection_hooks() -> None:
+    gaussian_model_cls = scene_module.GaussianModel
+    if getattr(gaussian_model_cls, "_prior_protection_hooks_installed", False):
+        return
+
+    original_training_setup = gaussian_model_cls.training_setup
+    original_reset_opacity = gaussian_model_cls.reset_opacity
+    original_prune_points = gaussian_model_cls.prune_points
+    original_densification_postfix = gaussian_model_cls.densification_postfix
+    original_densify_and_split = gaussian_model_cls.densify_and_split
+    original_densify_and_clone = gaussian_model_cls.densify_and_clone
+
+    def patched_training_setup(self, training_args):
+        original_training_setup(self, training_args)
+        if prior_protection_enabled(self):
+            self.optimizer = PriorProtectedOptimizer(self.optimizer, self)
+
+    def patched_reset_opacity(self):
+        mask = prior_point_mask(self)
+        config = getattr(self, "_prior_protection_config", None) or {}
+        if mask is None or not bool(config.get("protect_from_prune", True)):
+            return original_reset_opacity(self)
+        current_opacity = self._opacity.detach().clone()
+        opacities_new = inverse_sigmoid(
+            torch.min(self.get_opacity, torch.ones_like(self.get_opacity) * 0.01)
+        )
+        opacities_new[mask] = current_opacity[mask]
+        optimizable_tensors = self.replace_tensor_to_optimizer(opacities_new, "opacity")
+        self._opacity = optimizable_tensors["opacity"]
+
+    def patched_prune_points(self, mask):
+        prior_mask = prior_point_mask(self)
+        config = getattr(self, "_prior_protection_config", None) or {}
+        prune_mask = mask.clone()
+        if prior_mask is not None and bool(config.get("protect_from_prune", True)):
+            prune_mask = torch.logical_and(prune_mask, ~prior_mask)
+        valid_points_mask = ~prune_mask
+        original_prune_points(self, prune_mask)
+        prune_prior_mask(self, valid_points_mask)
+
+    def patched_densification_postfix(self, new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling, new_rotation, new_tmp_radii):
+        original_densification_postfix(
+            self,
+            new_xyz,
+            new_features_dc,
+            new_features_rest,
+            new_opacities,
+            new_scaling,
+            new_rotation,
+            new_tmp_radii,
+        )
+        extend_prior_mask(self, int(new_xyz.shape[0]))
+
+    def patched_densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
+        n_init_points = self.get_xyz.shape[0]
+        padded_grad = torch.zeros((n_init_points), device="cuda")
+        padded_grad[:grads.shape[0]] = grads.squeeze()
+        selected_pts_mask = torch.where(padded_grad >= grad_threshold, True, False)
+        selected_pts_mask = torch.logical_and(
+            selected_pts_mask,
+            torch.max(self.get_scaling, dim=1).values > self.percent_dense * scene_extent,
+        )
+        prior_mask = prior_point_mask(self)
+        config = getattr(self, "_prior_protection_config", None) or {}
+        if prior_mask is not None and bool(config.get("protect_from_densify", True)):
+            selected_pts_mask = torch.logical_and(selected_pts_mask, ~prior_mask)
+
+        stds = self.get_scaling[selected_pts_mask].repeat(N, 1)
+        means = torch.zeros((stds.size(0), 3), device="cuda")
+        samples = torch.normal(mean=means, std=stds)
+        rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N, 1, 1)
+        new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask].repeat(N, 1)
+        new_scaling = self.scaling_inverse_activation(self.get_scaling[selected_pts_mask].repeat(N, 1) / (0.8 * N))
+        new_rotation = self._rotation[selected_pts_mask].repeat(N, 1)
+        new_features_dc = self._features_dc[selected_pts_mask].repeat(N, 1, 1)
+        new_features_rest = self._features_rest[selected_pts_mask].repeat(N, 1, 1)
+        new_opacity = self._opacity[selected_pts_mask].repeat(N, 1)
+        new_tmp_radii = self.tmp_radii[selected_pts_mask].repeat(N)
+
+        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation, new_tmp_radii)
+        prune_filter = torch.cat(
+            (
+                selected_pts_mask,
+                torch.zeros(N * int(selected_pts_mask.sum().item()), device="cuda", dtype=bool),
+            )
+        )
+        self.prune_points(prune_filter)
+
+    def patched_densify_and_clone(self, grads, grad_threshold, scene_extent):
+        selected_pts_mask = torch.where(torch.norm(grads, dim=-1) >= grad_threshold, True, False)
+        selected_pts_mask = torch.logical_and(
+            selected_pts_mask,
+            torch.max(self.get_scaling, dim=1).values <= self.percent_dense * scene_extent,
+        )
+        prior_mask = prior_point_mask(self)
+        config = getattr(self, "_prior_protection_config", None) or {}
+        if prior_mask is not None and bool(config.get("protect_from_densify", True)):
+            selected_pts_mask = torch.logical_and(selected_pts_mask, ~prior_mask)
+
+        new_xyz = self._xyz[selected_pts_mask]
+        new_features_dc = self._features_dc[selected_pts_mask]
+        new_features_rest = self._features_rest[selected_pts_mask]
+        new_opacities = self._opacity[selected_pts_mask]
+        new_scaling = self._scaling[selected_pts_mask]
+        new_rotation = self._rotation[selected_pts_mask]
+        new_tmp_radii = self.tmp_radii[selected_pts_mask]
+        self.densification_postfix(
+            new_xyz,
+            new_features_dc,
+            new_features_rest,
+            new_opacities,
+            new_scaling,
+            new_rotation,
+            new_tmp_radii,
+        )
+
+    gaussian_model_cls.training_setup = patched_training_setup
+    gaussian_model_cls.reset_opacity = patched_reset_opacity
+    gaussian_model_cls.prune_points = patched_prune_points
+    gaussian_model_cls.densification_postfix = patched_densification_postfix
+    gaussian_model_cls.densify_and_split = patched_densify_and_split
+    gaussian_model_cls.densify_and_clone = patched_densify_and_clone
+    gaussian_model_cls._prior_protection_hooks_installed = True
 
 
 def load_alignment_spec(path: Path | None) -> dict[str, Any]:
@@ -91,86 +399,6 @@ def load_alignment_spec(path: Path | None) -> dict[str, Any]:
         ),
         "translation": payload.get("translation", [0.0, 0.0, 0.0]),
     }
-
-
-def quaternion_from_matrix(rotation_matrix: np.ndarray) -> np.ndarray:
-    m = rotation_matrix
-    trace = float(np.trace(m))
-    if trace > 0.0:
-        s = np.sqrt(trace + 1.0) * 2.0
-        w = 0.25 * s
-        x = (m[2, 1] - m[1, 2]) / s
-        y = (m[0, 2] - m[2, 0]) / s
-        z = (m[1, 0] - m[0, 1]) / s
-    elif m[0, 0] > m[1, 1] and m[0, 0] > m[2, 2]:
-        s = np.sqrt(1.0 + m[0, 0] - m[1, 1] - m[2, 2]) * 2.0
-        w = (m[2, 1] - m[1, 2]) / s
-        x = 0.25 * s
-        y = (m[0, 1] + m[1, 0]) / s
-        z = (m[0, 2] + m[2, 0]) / s
-    elif m[1, 1] > m[2, 2]:
-        s = np.sqrt(1.0 + m[1, 1] - m[0, 0] - m[2, 2]) * 2.0
-        w = (m[0, 2] - m[2, 0]) / s
-        x = (m[0, 1] + m[1, 0]) / s
-        y = 0.25 * s
-        z = (m[1, 2] + m[2, 1]) / s
-    else:
-        s = np.sqrt(1.0 + m[2, 2] - m[0, 0] - m[1, 1]) * 2.0
-        w = (m[1, 0] - m[0, 1]) / s
-        x = (m[0, 2] + m[2, 0]) / s
-        y = (m[1, 2] + m[2, 1]) / s
-        z = 0.25 * s
-    quat = np.asarray([w, x, y, z], dtype=np.float32)
-    return quat / np.linalg.norm(quat)
-
-
-def quaternion_multiply(q_left: np.ndarray, q_right: np.ndarray) -> np.ndarray:
-    w1, x1, y1, z1 = q_left
-    w2, x2, y2, z2 = q_right
-    quat = np.asarray(
-        [
-            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
-            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
-            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
-            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
-        ],
-        dtype=np.float32,
-    )
-    return quat / np.linalg.norm(quat)
-
-
-def parse_scale(scale_value: Any, *, allow_anisotropic: bool = False) -> tuple[np.ndarray, float | None]:
-    if isinstance(scale_value, (int, float)):
-        scalar = float(scale_value)
-        return np.asarray([scalar, scalar, scalar], dtype=np.float32), scalar
-
-    scale = np.asarray(scale_value, dtype=np.float32)
-    if scale.shape != (3,):
-        raise ValueError("scale must be a scalar or a 3-vector")
-    if allow_anisotropic:
-        return scale, None
-    if not np.allclose(scale, scale[0]):
-        raise ValueError("Gaussian prior alignment currently supports isotropic scale only")
-    return scale, float(scale[0])
-
-
-def detect_asset_format(vertex: np.ndarray) -> str:
-    names = vertex.dtype.names or ()
-    if {"opacity", "f_dc_0", "scale_0", "rot_0"}.issubset(set(names)):
-        return "gaussian"
-    if {"red", "green", "blue"}.issubset(set(names)):
-        return "point_cloud"
-    raise ValueError(f"Unsupported PLY schema: {names}")
-
-
-def transform_positions(
-    xyz: np.ndarray,
-    *,
-    scale: np.ndarray,
-    rotation_matrix: np.ndarray,
-    translation: np.ndarray,
-) -> np.ndarray:
-    return (xyz * scale) @ rotation_matrix.T + translation
 
 
 def write_structured_ply(path: Path, data: np.ndarray) -> None:
@@ -243,37 +471,22 @@ def prepare_prior_asset(prior_ply: Path, alignment_json: Path | None, output_pat
     ply = PlyData.read(prior_ply)
     vertex = np.array(ply["vertex"].data, copy=True)
     asset_format = detect_asset_format(vertex)
-    scale_vec, scale_scalar = parse_scale(
-        alignment["scale"],
-        allow_anisotropic=asset_format == "point_cloud",
-    )
-
-    xyz = np.stack([vertex["x"], vertex["y"], vertex["z"]], axis=1).astype(np.float32)
-    xyz = transform_positions(
-        xyz,
-        scale=scale_vec,
-        rotation_matrix=rotation_matrix,
-        translation=translation,
-    )
-    vertex["x"] = xyz[:, 0]
-    vertex["y"] = xyz[:, 1]
-    vertex["z"] = xyz[:, 2]
+    scale_vec = parse_scale(alignment["scale"]).astype(np.float32)
 
     if asset_format == "gaussian":
-        if scale_scalar is None or scale_scalar <= 0.0:
-            raise ValueError("scale must be positive for gaussian priors")
-        for field_name in ("scale_0", "scale_1", "scale_2"):
-            vertex[field_name] = vertex[field_name] + np.float32(np.log(scale_scalar))
-
-        align_quat = quaternion_from_matrix(rotation_matrix)
-        quats = np.stack([vertex["rot_0"], vertex["rot_1"], vertex["rot_2"], vertex["rot_3"]], axis=1).astype(np.float32)
-        rotated = np.stack([quaternion_multiply(align_quat, quat) for quat in quats], axis=0)
-        vertex["rot_0"] = rotated[:, 0]
-        vertex["rot_1"] = rotated[:, 1]
-        vertex["rot_2"] = rotated[:, 2]
-        vertex["rot_3"] = rotated[:, 3]
-        output_vertex = vertex
+        output_vertex = transform_gaussian_vertex(
+            vertex,
+            rotation_matrix=rotation_matrix,
+            scale=scale_vec,
+            translation=translation,
+        )
     else:
+        xyz = np.stack([vertex["x"], vertex["y"], vertex["z"]], axis=1).astype(np.float32)
+        xyz = transform_positions(
+            xyz,
+            affine_matrix=rotation_matrix.astype(np.float64) @ np.diag(scale_vec.astype(np.float64)),
+            translation=translation.astype(np.float64),
+        ).astype(np.float32)
         output_vertex = build_point_cloud_vertex(xyz, vertex)
 
     write_structured_ply(output_path, output_vertex)
@@ -441,6 +654,34 @@ def apply_insertion_policy(prior_pcd, prepared_item: dict[str, Any], *, init_mod
     return prior_pcd, updated
 
 
+def apply_gaussian_insertion_policy(vertex: np.ndarray, prepared_item: dict[str, Any], *, init_mode: str):
+    updated = dict(prepared_item)
+    raw_score = updated.get("prior_score")
+    normalized_confidence = float(updated.get("normalized_confidence", 1.0) or 0.0)
+    requested_keep_ratio = float(updated.get("point_keep_ratio", 1.0) or 0.0)
+    dropped = bool(updated.get("dropped", False))
+    original_count = int(vertex.shape[0])
+
+    updated["prior_score"] = float(raw_score) if raw_score is not None else None
+    updated["normalized_confidence"] = normalized_confidence
+    updated["requested_point_keep_ratio"] = requested_keep_ratio
+    updated["original_point_count"] = original_count
+
+    if dropped:
+        updated["applied_point_keep_ratio"] = 0.0
+        updated["kept_point_count"] = 0
+        updated["dropped"] = True
+        return None, updated
+
+    if init_mode != "merge":
+        raise ValueError("Gaussian priors currently support init_mode='merge' or init_mode='replace' only")
+
+    updated["applied_point_keep_ratio"] = 1.0
+    updated["kept_point_count"] = original_count
+    updated["dropped"] = False
+    return vertex, updated
+
+
 def initialize_loaded_prior(gaussians, train_cam_infos, cameras_extent: float) -> None:
     gaussians.spatial_lr_scale = cameras_extent
     gaussians.max_radii2D = torch.zeros((gaussians.get_xyz.shape[0]), device="cuda")
@@ -451,16 +692,100 @@ def initialize_loaded_prior(gaussians, train_cam_infos, cameras_extent: float) -
     gaussians._exposure = nn.Parameter(exposure.requires_grad_(True))
 
 
+def gaussian_vertex_to_model_tensors(vertex: np.ndarray, *, max_sh_degree: int) -> dict[str, torch.Tensor]:
+    xyz = np.stack(
+        [
+            np.asarray(vertex["x"], dtype=np.float32),
+            np.asarray(vertex["y"], dtype=np.float32),
+            np.asarray(vertex["z"], dtype=np.float32),
+        ],
+        axis=1,
+    )
+    opacities = np.asarray(vertex["opacity"], dtype=np.float32)[..., np.newaxis]
+
+    features_dc = np.zeros((xyz.shape[0], 3, 1), dtype=np.float32)
+    features_dc[:, 0, 0] = np.asarray(vertex["f_dc_0"], dtype=np.float32)
+    features_dc[:, 1, 0] = np.asarray(vertex["f_dc_1"], dtype=np.float32)
+    features_dc[:, 2, 0] = np.asarray(vertex["f_dc_2"], dtype=np.float32)
+
+    extra_f_names = sorted(
+        [name for name in (vertex.dtype.names or ()) if name.startswith("f_rest_")],
+        key=lambda name: int(name.split("_")[-1]),
+    )
+    expected_rest = 3 * ((max_sh_degree + 1) ** 2 - 1)
+    if len(extra_f_names) != expected_rest:
+        raise ValueError(
+            f"Gaussian SH degree mismatch: expected {expected_rest} f_rest fields, found {len(extra_f_names)}"
+        )
+
+    features_extra = np.zeros((xyz.shape[0], len(extra_f_names)), dtype=np.float32)
+    for index, field_name in enumerate(extra_f_names):
+        features_extra[:, index] = np.asarray(vertex[field_name], dtype=np.float32)
+    features_extra = features_extra.reshape((xyz.shape[0], 3, (max_sh_degree + 1) ** 2 - 1))
+
+    scales = np.stack(
+        [
+            np.asarray(vertex["scale_0"], dtype=np.float32),
+            np.asarray(vertex["scale_1"], dtype=np.float32),
+            np.asarray(vertex["scale_2"], dtype=np.float32),
+        ],
+        axis=1,
+    )
+    rotations = np.stack(
+        [
+            np.asarray(vertex["rot_0"], dtype=np.float32),
+            np.asarray(vertex["rot_1"], dtype=np.float32),
+            np.asarray(vertex["rot_2"], dtype=np.float32),
+            np.asarray(vertex["rot_3"], dtype=np.float32),
+        ],
+        axis=1,
+    )
+
+    return {
+        "xyz": torch.tensor(xyz, dtype=torch.float, device="cuda"),
+        "f_dc": torch.tensor(features_dc, dtype=torch.float, device="cuda").transpose(1, 2).contiguous(),
+        "f_rest": torch.tensor(features_extra, dtype=torch.float, device="cuda").transpose(1, 2).contiguous(),
+        "opacity": torch.tensor(opacities, dtype=torch.float, device="cuda"),
+        "scaling": torch.tensor(scales, dtype=torch.float, device="cuda"),
+        "rotation": torch.tensor(rotations, dtype=torch.float, device="cuda"),
+    }
+
+
+def append_gaussian_vertex_to_model(gaussians, vertex: np.ndarray) -> None:
+    tensors = gaussian_vertex_to_model_tensors(vertex, max_sh_degree=gaussians.max_sh_degree)
+    gaussians._xyz = nn.Parameter(torch.cat((gaussians._xyz, tensors["xyz"]), dim=0).requires_grad_(True))
+    gaussians._features_dc = nn.Parameter(
+        torch.cat((gaussians._features_dc, tensors["f_dc"]), dim=0).requires_grad_(True)
+    )
+    gaussians._features_rest = nn.Parameter(
+        torch.cat((gaussians._features_rest, tensors["f_rest"]), dim=0).requires_grad_(True)
+    )
+    gaussians._opacity = nn.Parameter(
+        torch.cat((gaussians._opacity, tensors["opacity"]), dim=0).requires_grad_(True)
+    )
+    gaussians._scaling = nn.Parameter(
+        torch.cat((gaussians._scaling, tensors["scaling"]), dim=0).requires_grad_(True)
+    )
+    gaussians._rotation = nn.Parameter(
+        torch.cat((gaussians._rotation, tensors["rotation"]), dim=0).requires_grad_(True)
+    )
+    gaussians.active_sh_degree = gaussians.max_sh_degree
+    gaussians.max_radii2D = torch.zeros((gaussians.get_xyz.shape[0]), device="cuda")
+
+
 def write_prior_metadata(
     model_path: Path,
     *,
     selected_priors: list[dict[str, Any]],
     init_mode: str,
+    prior_protection: dict[str, Any] | None = None,
 ) -> None:
     metadata = {
         "selected_priors": selected_priors,
         "init_mode": init_mode,
     }
+    if prior_protection is not None:
+        metadata["prior_protection"] = prior_protection
     if len(selected_priors) == 1:
         item = selected_priors[0]
         metadata["source_prior"] = item.get("source_prior")
@@ -578,6 +903,10 @@ def propagate_prior_runtime_args(dataset: Any, args: argparse.Namespace) -> None
         setattr(dataset, "prepared_init_formats", list(getattr(args, "prepared_init_formats")))
     if getattr(args, "selected_priors_metadata", None):
         setattr(dataset, "selected_priors_metadata", list(getattr(args, "selected_priors_metadata")))
+    setattr(dataset, "prior_protection_mode", str(getattr(args, "prior_protection_mode", "none")))
+    setattr(dataset, "prior_lr_scale", float(getattr(args, "prior_lr_scale", 0.05)))
+    setattr(dataset, "protect_prior_from_prune", bool(getattr(args, "protect_prior_from_prune", True)))
+    setattr(dataset, "protect_prior_from_densify", bool(getattr(args, "protect_prior_from_densify", True)))
 
 
 def make_prior_init_scene():
@@ -721,11 +1050,13 @@ def make_prior_init_scene():
                 )
             elif prepared_init_plys:
                 init_mode = getattr(args, "init_mode", "merge")
+                protection_config = build_prior_protection_config(args)
                 if init_mode == "replace":
                     if len(prepared_init_plys) != 1:
                         raise ValueError("replace init_mode supports exactly one prepared prior")
                     init_path = Path(prepared_init_plys[0])
                     prepared_asset_format = prepared_init_formats[0]
+                    current_selected_priors = [dict(item) for item in selected_priors_metadata]
                     if prepared_asset_format == "gaussian":
                         self.gaussians.load_ply(str(init_path), args.train_test_exp)
                         initialize_loaded_prior(self.gaussians, train_cam_infos, self.cameras_extent)
@@ -734,12 +1065,30 @@ def make_prior_init_scene():
                         self.gaussians.create_from_pcd(pcd, train_cam_infos, self.cameras_extent)
                     else:
                         raise ValueError(f"Unsupported prepared asset format: {prepared_asset_format}")
+                    total_points = int(self.gaussians.get_xyz.shape[0])
+                    if current_selected_priors:
+                        current_selected_priors[0]["protected_index_start"] = 0
+                        current_selected_priors[0]["protected_index_end"] = total_points
+                        current_selected_priors[0]["protected_point_count"] = total_points
+                    configure_prior_protection(
+                        self.gaussians,
+                        args=args,
+                        selected_priors=current_selected_priors,
+                    )
+                    write_prior_metadata(
+                        Path(self.model_path),
+                        selected_priors=current_selected_priors,
+                        init_mode=init_mode,
+                        prior_protection=protection_config,
+                    )
                 elif init_mode in {"merge", "weighted_merge", "filtered_merge"}:
                     merged_pcd = scene_info.point_cloud
+                    base_point_count = int(np.asarray(scene_info.point_cloud.points).shape[0])
+                    current_point_index = base_point_count
+                    gaussian_vertices_to_append: list[tuple[np.ndarray, dict[str, Any]]] = []
                     updated_selected_priors: list[dict[str, Any]] = []
                     for init_path_value, init_format in zip(prepared_init_plys, prepared_init_formats):
                         index = len(updated_selected_priors)
-                        prior_pcd = prepared_asset_to_point_cloud(Path(init_path_value), init_format)
                         metadata_item = (
                             dict(selected_priors_metadata[index])
                             if index < len(selected_priors_metadata)
@@ -748,21 +1097,66 @@ def make_prior_init_scene():
                                 "asset_format": init_format,
                             }
                         )
+                        if init_format == "gaussian":
+                            gaussian_vertex = np.array(
+                                PlyData.read(Path(init_path_value))["vertex"].data,
+                                copy=True,
+                            )
+                            filtered_vertex, updated_item = apply_gaussian_insertion_policy(
+                                gaussian_vertex,
+                                metadata_item,
+                                init_mode=init_mode,
+                            )
+                            if filtered_vertex is None:
+                                updated_item["protected_index_start"] = None
+                                updated_item["protected_index_end"] = None
+                                updated_item["protected_point_count"] = 0
+                                updated_selected_priors.append(updated_item)
+                                continue
+                            updated_item["protected_point_count"] = int(filtered_vertex.shape[0])
+                            gaussian_vertices_to_append.append((filtered_vertex, updated_item))
+                            updated_selected_priors.append(updated_item)
+                            continue
+
+                        prior_pcd = prepared_asset_to_point_cloud(Path(init_path_value), init_format)
                         filtered_pcd, updated_item = apply_insertion_policy(
                             prior_pcd,
                             metadata_item,
                             init_mode=init_mode,
                         )
-                        updated_selected_priors.append(updated_item)
                         if filtered_pcd is None:
+                            updated_item["protected_index_start"] = None
+                            updated_item["protected_index_end"] = None
+                            updated_item["protected_point_count"] = 0
+                            updated_selected_priors.append(updated_item)
                             continue
+                        kept_point_count = int(np.asarray(filtered_pcd.points).shape[0])
+                        updated_item["protected_index_start"] = current_point_index
+                        updated_item["protected_index_end"] = current_point_index + kept_point_count
+                        updated_item["protected_point_count"] = kept_point_count
+                        current_point_index += kept_point_count
+                        updated_selected_priors.append(updated_item)
                         merged_pcd = merge_point_clouds(merged_pcd, filtered_pcd)
                     self.gaussians.create_from_pcd(merged_pcd, train_cam_infos, self.cameras_extent)
+                    current_gaussian_index = int(self.gaussians.get_xyz.shape[0])
+                    for gaussian_vertex, updated_item in gaussian_vertices_to_append:
+                        point_count = int(gaussian_vertex.shape[0])
+                        updated_item["protected_index_start"] = current_gaussian_index
+                        updated_item["protected_index_end"] = current_gaussian_index + point_count
+                        updated_item["protected_point_count"] = point_count
+                        append_gaussian_vertex_to_model(self.gaussians, gaussian_vertex)
+                        current_gaussian_index += point_count
+                    configure_prior_protection(
+                        self.gaussians,
+                        args=args,
+                        selected_priors=updated_selected_priors,
+                    )
                     if updated_selected_priors:
                         write_prior_metadata(
                             Path(self.model_path),
                             selected_priors=updated_selected_priors,
                             init_mode=init_mode,
+                            prior_protection=protection_config,
                         )
                 else:
                     raise ValueError(f"Unsupported init_mode: {init_mode}")
@@ -772,8 +1166,17 @@ def make_prior_init_scene():
             save_initial_snapshot(self, args)
 
         def save(self, iteration):
-            point_cloud_path = os.path.join(self.model_path, "point_cloud/iteration_{}".format(iteration))
-            self.gaussians.save_ply(os.path.join(point_cloud_path, "point_cloud.ply"))
+            point_cloud_path = Path(self.model_path) / "point_cloud" / f"iteration_{iteration}"
+            self.gaussians.save_ply(str(point_cloud_path / "point_cloud.ply"))
+            ensure_named_point_cloud(
+                iteration_dir=point_cloud_path,
+                experiment_name=infer_experiment_name(Path(self.model_path)),
+                iteration=int(iteration),
+                protection_mode=str(getattr(args, "prior_protection_mode", "none")),
+                protect_from_prune=bool(getattr(args, "protect_prior_from_prune", False)),
+                protect_from_densify=bool(getattr(args, "protect_prior_from_densify", False)),
+            )
+            write_prior_protection_checkpoint(Path(self.model_path), int(iteration), self.gaussians)
             exposure_dict = {
                 image_name: self.gaussians.get_exposure_from_name(image_name).detach().cpu().numpy().tolist()
                 for image_name in self.gaussians.exposure_mapping
@@ -853,6 +1256,17 @@ def build_parser() -> tuple[argparse.ArgumentParser, Any, Any, Any]:
         default="merge",
         choices=["merge", "replace", "weighted_merge", "filtered_merge"],
     )
+    parser.add_argument(
+        "--prior-protection-mode",
+        type=str,
+        default="none",
+        choices=["none", "freeze", "weak"],
+    )
+    parser.add_argument("--prior-lr-scale", type=float, default=0.05)
+    parser.add_argument("--protect-prior-from-prune", action="store_true", default=True)
+    parser.add_argument("--no-protect-prior-from-prune", dest="protect_prior_from_prune", action="store_false")
+    parser.add_argument("--protect-prior-from-densify", action="store_true", default=True)
+    parser.add_argument("--no-protect-prior-from-densify", dest="protect_prior_from_densify", action="store_false")
     return parser, lp, op, pp
 
 
@@ -924,6 +1338,7 @@ def main() -> int:
         args.prepared_init_ply = str(prepared_init_ply)
         args.prepared_init_format = prepared_asset_format
     propagate_prior_runtime_args(dataset, args)
+    install_prior_protection_hooks()
 
     scene_class = make_prior_init_scene()
     train_module.Scene = scene_class

@@ -212,6 +212,35 @@ def compute_scene_focus(targets: list[ReplicaOracleTarget]) -> tuple[np.ndarray,
     return focus_center.astype(np.float32), max(scene_radius, 0.25)
 
 
+def camera_pose_key(position: np.ndarray) -> tuple[float, ...]:
+    return tuple(np.round(np.asarray(position, dtype=np.float32), 4).tolist())
+
+
+def azimuth_bin_index(
+    position: np.ndarray,
+    focus_center: np.ndarray,
+    *,
+    bin_count: int,
+) -> int:
+    count = max(int(bin_count), 1)
+    rel_xy = np.asarray(position, dtype=np.float32)[:2] - np.asarray(focus_center, dtype=np.float32)[:2]
+    angle = math.atan2(float(rel_xy[1]), float(rel_xy[0]))
+    normalized = (angle + math.pi) / (2.0 * math.pi)
+    return int(math.floor(normalized * count)) % count
+
+
+def accepted_azimuth_histogram(
+    frames: list[CameraFrame],
+    focus_center: np.ndarray,
+    *,
+    bin_count: int,
+) -> list[int]:
+    counts = [0] * max(int(bin_count), 1)
+    for frame in frames:
+        counts[azimuth_bin_index(frame.position, focus_center, bin_count=bin_count)] += 1
+    return counts
+
+
 def generate_scene_orbit_camera_poses(
     targets: list[ReplicaOracleTarget],
     *,
@@ -237,6 +266,81 @@ def generate_scene_orbit_camera_poses(
         rotation = look_at_opencv(eye, focus_center, up)
         poses.append((eye, rotation))
     return poses
+
+
+def select_multi_object_candidate_infos(
+    candidate_infos: list[dict[str, Any]],
+    *,
+    total_views: int,
+    target_ids: list[int],
+    focus_center: np.ndarray,
+    selection_mode: str,
+    azimuth_bin_count: int,
+) -> list[dict[str, Any]]:
+    ranked_candidates = sorted(
+        candidate_infos,
+        key=lambda info: float(info["union_visible_ratio"]),
+        reverse=True,
+    )
+    selected_infos: list[dict[str, Any]] = []
+    seen_pose_keys: set[tuple[float, ...]] = set()
+
+    # Ensure every selected target contributes at least one crop when possible.
+    for target_id in target_ids:
+        target_specific = next(
+            (
+                info
+                for info in ranked_candidates
+                if float(info["visible_ratios"].get(target_id, 0.0)) > 0.0
+            ),
+            None,
+        )
+        if target_specific is None:
+            continue
+        pose_key = camera_pose_key(np.asarray(target_specific["position"], dtype=np.float32))
+        if pose_key in seen_pose_keys:
+            continue
+        selected_infos.append(target_specific)
+        seen_pose_keys.add(pose_key)
+
+    if selection_mode == "diverse_azimuth":
+        binned_candidates: dict[int, list[dict[str, Any]]] = {index: [] for index in range(max(azimuth_bin_count, 1))}
+        for info in ranked_candidates:
+            bin_index = azimuth_bin_index(
+                np.asarray(info["position"], dtype=np.float32),
+                focus_center,
+                bin_count=azimuth_bin_count,
+            )
+            binned_candidates[bin_index].append(info)
+
+        while len(selected_infos) < total_views:
+            progress = False
+            for bin_index in range(max(azimuth_bin_count, 1)):
+                bucket = binned_candidates[bin_index]
+                while bucket:
+                    candidate = bucket.pop(0)
+                    pose_key = camera_pose_key(np.asarray(candidate["position"], dtype=np.float32))
+                    if pose_key in seen_pose_keys:
+                        continue
+                    selected_infos.append(candidate)
+                    seen_pose_keys.add(pose_key)
+                    progress = True
+                    break
+                if len(selected_infos) >= total_views:
+                    break
+            if not progress:
+                break
+
+    for info in ranked_candidates:
+        if len(selected_infos) >= total_views:
+            break
+        pose_key = camera_pose_key(np.asarray(info["position"], dtype=np.float32))
+        if pose_key in seen_pose_keys:
+            continue
+        selected_infos.append(info)
+        seen_pose_keys.add(pose_key)
+
+    return selected_infos[:total_views]
 
 
 def crop_rgb_by_mask(rgb: np.ndarray, mask: np.ndarray) -> Image.Image:
@@ -714,10 +818,14 @@ def export_replica_multi_oracle_scene(
     radius_min: float,
     radius_max: float,
     min_visible_ratio: float,
+    selection_mode: str = "top_visibility",
+    azimuth_bin_count: int = 8,
+    candidate_pose_count: int | None = None,
     render_point_count: int = 1_000_000,
 ) -> Path:
     scene_root = raw_root / scene_id
     targets = select_top_targets(scene_root, categories=list(categories), max_objects=max_objects)
+    focus_center, _ = compute_scene_focus(targets)
     output_scene_root = output_root / scene_id
     images_dir = output_scene_root / "images"
     oracle_dir = output_scene_root / "oracle"
@@ -747,7 +855,7 @@ def export_replica_multi_oracle_scene(
         accepted: list[CameraFrame] = []
         candidate_poses = generate_scene_orbit_camera_poses(
             targets,
-            count=max(total_views * 48, 512),
+            count=int(candidate_pose_count) if candidate_pose_count is not None else max(total_views * 48, 512),
             seed=seed,
             radius_min=radius_min,
             radius_max=radius_max,
@@ -785,42 +893,14 @@ def export_replica_multi_oracle_scene(
                 f"Only collected {len(ranked_candidates)} usable multi-object views for {scene_id}, need {total_views}"
             )
 
-        ranked_candidates = sorted(
+        selected_infos = select_multi_object_candidate_infos(
             ranked_candidates,
-            key=lambda info: float(info["union_visible_ratio"]),
-            reverse=True,
+            total_views=total_views,
+            target_ids=target_ids,
+            focus_center=focus_center,
+            selection_mode=selection_mode,
+            azimuth_bin_count=azimuth_bin_count,
         )
-        selected_infos: list[dict[str, Any]] = []
-        seen_pose_keys: set[tuple[float, ...]] = set()
-
-        # Ensure every selected target contributes at least one crop when possible.
-        for target_id in target_ids:
-            target_specific = next(
-                (
-                    info
-                    for info in ranked_candidates
-                    if float(info["visible_ratios"].get(target_id, 0.0)) > 0.0
-                ),
-                None,
-            )
-            if target_specific is None:
-                continue
-            pose_key = tuple(np.round(np.asarray(target_specific["position"], dtype=np.float32), 4).tolist())
-            if pose_key in seen_pose_keys:
-                continue
-            selected_infos.append(target_specific)
-            seen_pose_keys.add(pose_key)
-
-        for info in ranked_candidates:
-            if len(selected_infos) >= total_views:
-                break
-            pose_key = tuple(np.round(np.asarray(info["position"], dtype=np.float32), 4).tolist())
-            if pose_key in seen_pose_keys:
-                continue
-            selected_infos.append(info)
-            seen_pose_keys.add(pose_key)
-
-        selected_infos = selected_infos[:total_views]
         for info in selected_infos:
             rgb, semantic = renderer.render(
                 position=np.asarray(info["position"], dtype=np.float32),
@@ -879,6 +959,8 @@ def export_replica_multi_oracle_scene(
         "subset_id": scene_id,
         "export_type": "colmap_text_gt_multi_object",
         "frame_count": len(accepted),
+        "train_view_count": len(accepted) - test_views,
+        "test_view_count": test_views,
         "notes": [
             "Rendered from Replica GT mesh using a scene-centric multi-object camera path.",
             "Camera poses and sparse points are generated from ground truth, not COLMAP estimation.",
@@ -888,6 +970,14 @@ def export_replica_multi_oracle_scene(
         "oracle_categories": list(categories),
         "oracle_max_objects": len(targets),
         "oracle_effective_min_visible_ratio": effective_min_visible_ratio,
+        "camera_selection_mode": selection_mode,
+        "camera_azimuth_bin_count": int(azimuth_bin_count),
+        "camera_azimuth_histogram": accepted_azimuth_histogram(
+            accepted,
+            focus_center,
+            bin_count=azimuth_bin_count,
+        ),
+        "candidate_pose_count": len(candidate_poses),
     }
     (output_scene_root / "scene_meta.json").write_text(json.dumps(scene_meta, indent=2), encoding="utf-8")
 

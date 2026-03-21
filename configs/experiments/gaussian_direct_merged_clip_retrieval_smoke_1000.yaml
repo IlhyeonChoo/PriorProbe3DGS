@@ -1,0 +1,40 @@
+experiment:
+  name: gaussian_direct_merged_clip_retrieval_smoke_1000
+  initialization: prior
+  reconstruction_backend: vanilla_3dgs
+  dataset_config: configs/datasets/replica_multi_shared.yaml
+  prior_config: outputs/gaussian_direct/prior_library/replica_target_exact_plus_shapesplat_clip.yaml
+  retrieval_mode: feature
+  alignment_mode: oracle_target_box
+  insertion_representation: gaussian_direct
+  adaptation: none
+  prior_object_id: null
+  feature_backend: clip
+
+oracle:
+  categories: [chair, sofa, table, lamp]
+  max_objects: 4
+
+backend:
+  repo_path: ../3DGS/gaussian-splatting
+  python_executable: ../3DGS/gaussian-splatting/venv/bin/python
+  source_path: /path/to/colmap_scene
+  model_path: CHANGE_ME_DATASET_OUTPUT
+  disable_viewer: true
+  quiet: true
+  dry_run: false
+  init_mode: merge
+
+artifacts:
+  save_initial_snapshot: true
+  initial_render_sets: [train, test]
+
+prior_alignment:
+  anchor_mode: auto
+
+trainer:
+  iterations: 1000
+  sh_degree: 3
+  test_iterations: [250, 500, 1000]
+  save_iterations: [250, 500, 1000]
+  checkpoint_iterations: []
