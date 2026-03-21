@@ -104,3 +104,10 @@ outputs/*/reports/**/*
 !logs/*/
 logs/*/**/*
 !logs/*/.gitkeep
+
+
+
+# AI용 파일
+CLAUDE.md
+AGENTS.md
+
