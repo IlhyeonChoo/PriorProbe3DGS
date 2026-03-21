@@ -138,6 +138,72 @@ Status: pre-implementation planning note
 - milestone 단위로만 설계 문서와 실험 문서를 갱신한다.
 - 실패한 방향도 버리기 전에 간단히 남겨서, 같은 실수를 반복하지 않게 한다.
 
+## Experimental Findings (2026-03-20)
+
+### 문제 현상
+
+초기 실험들의 결과 품질이 기대에 미치지 못했다. 최종 렌더링 결과를 분석한 결과 다음 패턴이 반복적으로 관찰되었다.
+
+- 삽입된 prior Gaussian들이 최적화 이후 전부 사라지거나 opacity가 극단적으로 낮아짐
+- 초기에 생성된 3D Gaussian primitive들도 동일하게 희미해지는 경향
+- 최종 재구성 품질이 from-scratch baseline과 차이가 없거나 오히려 낮음
+
+### 원인 분석: Input Image 시점 편향
+
+근본 원인은 **reconstruction에 사용하는 input image들이 특정 방향의 시점에 집중**되어 있다는 점이다.
+
+3DGS 최적화 관점에서, Gaussian primitive는 학습 뷰의 렌더링에 기여해야 살아남는다. Densification 및 pruning 과정에서 어떤 학습 뷰에도 기여하지 않는(즉, 모든 학습 카메라 시점에서 가려지거나 보이지 않는 위치에 있는) Gaussian은 opacity가 0으로 수렴하거나 제거된다.
+
+prior를 삽입한 위치가 input image들의 시점 방향에서 보이지 않는 영역에 해당할 경우:
+
+1. 삽입된 prior Gaussian들이 어떤 학습 뷰에도 렌더링 기여를 하지 않음
+2. 최적화 과정에서 해당 Gaussian들을 제거하는 방향으로 gradient가 작용
+3. 결과적으로 prior 삽입이 초기화 품질 향상이 아니라 **불필요한 Gaussian 제거 비용**으로 작용하여 오히려 최적화를 방해
+
+정리하면, prior 삽입 효과를 보려면 prior가 삽입된 위치가 **충분한 수의 학습 뷰에서 관찰 가능해야** 한다는 전제가 필요하다. 현재 데이터셋의 시점 편향이 이 전제를 깨고 있었다.
+
+### 현재 진행 중인 실험
+
+위 원인 분석을 바탕으로, **input image의 수와 시점 다양성을 늘려** prior 삽입 효과가 실제로 드러나는 조건을 먼저 확보하는 실험을 진행 중이다.
+
+목표:
+- prior가 삽입된 위치를 다양한 방향에서 관찰하는 카메라 뷰 확보
+- 시점 편향 해소 후 prior 삽입 효과가 실제로 나타나는지 확인
+- 이 조건이 확인되면, 이후 시점 수를 다시 줄여가며 효과가 유지되는 최소 조건을 탐색
+
+### 후속 방향
+
+이 실험의 결과에 따라:
+- **효과가 나타나는 경우:** 시점 커버리지를 실험 설계의 통제 변수로 명시적으로 추가
+- **효과가 여전히 없는 경우:** prior 자체의 문제(scale mismatch, appearance mismatch 등)로 원인을 재탐색
+
+### 추가 실험: Prior Protection (`room_0`)
+
+시점 다양화를 늘린 뒤에도 `room_0`에서는 same-scene exact prior가 15000 iter 시점에 약해지거나 사실상 사라지는 현상이 계속 관찰됐다. 따라서 다음 단계로 삽입 prior에 대해 별도 보호 정책을 넣었다.
+
+구현:
+- `prior_protection_mode = none | freeze | weak`
+- prior Gaussian에 대해 gradient scaling 적용
+- prior Gaussian은 prune 대상에서 제외
+- prior Gaussian은 densify clone/split 대상에서 제외
+- checkpoint마다 `prior_protection.json`과 `prior_points.ply` 기록
+
+실험 결과:
+- `freeze`는 prior `100000개`를 끝까지 유지했지만 수렴을 크게 해쳤다.
+  - `time-to-target = 183.71s`
+  - `final PSNR = 11.8588`
+- `weak (lr_scale=0.02)`는 prior `100000개`를 끝까지 유지하면서 `room_0`에서 speedup을 회복했다.
+  - `time-to-target = 112.03s`
+  - baseline `118.85s`, unprotected exact `124.03s`보다 빠름
+  - 다만 `final PSNR = 12.3749`로 baseline `12.4879`보다는 약간 낮음
+
+현재 해석:
+- dense view만으로는 prior 파괴를 막기에 부족했다
+- hard freeze는 너무 강하다
+- `weak + prune/densify protection`이 현재 가장 유망한 다음 실험 조건이다
+
+상세 수치는 `docs/experiments/replica_gaussian_direct_prior_protection_room_0_2026-03-20.md`에 기록한다.
+
 ## Initial Branch Success Criteria
 
 이 브랜치의 첫 성공 기준은 다음과 같다.

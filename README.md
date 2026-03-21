@@ -1,8 +1,10 @@
 # PriorProbe3DGS
 
-PriorProbe3DGS는 사전 학습된 3D Gaussian Splatting(3DGS) object prior가 장면 최적화 시간을 실제로 단축하는지 통제된 환경에서 검증하기 위한 1단계 연구 레포지토리다.
+PriorProbe3DGS는 사전 학습된 3D Gaussian Splatting(3DGS) object prior가 장면 최적화 시간을 실제로 단축하는지 통제된 환경에서 검증하기 위한 연구 레포지토리다.
 
-현재 레포는 연구 계획 문서에 맞춘 초기 골격을 포함한다. 구현은 placeholder 수준이지만, 디렉토리 구조, 설정 파일, 스크립트 진입점, 패키지 인터페이스는 바로 확장할 수 있게 정리되어 있다.
+핵심 질문은 단순하다: **도메인 보강된 prior를 재사용하면 from-scratch 3DGS보다 빠르게 같은 품질에 도달하는가?**
+
+이 레포는 [ReCompose3D](https://github.com/CNU26-3DGS/ReCompose3D) 프로젝트의 1단계 연구에 해당하며, 여기서 검증된 prior 전략은 2단계(ReCompose3D)에서 가속축 결합 파이프라인의 기반으로 사용된다.
 
 ## Research Questions
 
@@ -11,50 +13,165 @@ PriorProbe3DGS는 사전 학습된 3D Gaussian Splatting(3DGS) object prior가 �
 3. ShapeSplat 그대로 사용, 객체 증분 추가, 경량 추가학습 중 어느 전략이 가장 실용적인가?
 4. 성능이 기대에 미치지 못할 경우, 병목이 prior 품질인지 retrieval 품질인지 insertion 품질인지?
 
+## Experimental Design
+
+### Comparison Groups (실행 순서)
+
+총 6개 비교군을 순차적으로 실행하여 원인을 단계적으로 분리한다.
+
+| 순위 | 비교군 | 목적 |
+|------|--------|------|
+| 1 | from-scratch 3DGS | baseline |
+| 1 | oracle prior | prior 재사용의 원리적 효과 확인 |
+| 2 | oracle prior + oracle alignment | 성능 상한선 확인 |
+| 3 | ShapeSplat 기본 prior + 자동 alignment | 자동화 gap 측정 |
+| 4 | 도메인 증분 prior + 자동 alignment | 도메인 보강 효과 |
+| 4 | 도메인 증분 prior + 경량 적응 | 추가학습 필요성 판단 |
+
+oracle prior는 아래 3개 조건으로 단계적으로 세분화한다.
+
+| 조건 | 설명 | 목적 |
+|------|------|------|
+| A | Oracle Prior + Oracle Alignment | 이론적 상한선 (ceiling) |
+| B | 동일 객체 lib 보유 + 자동 retrieval/insertion | 이상적 조건 자동화 성능 |
+| C | 동일 객체 lib 미보유 (유사 객체 매칭) | 현실적 시나리오 성능 |
+
+### Data Strategy
+
+- **Phase A:** 공개 데이터셋(Replica, ScanNet 등) 기반의 단순 실내 장면
+- **Phase B:** 직접 촬영한 실내 장면으로 도메인 일치도가 높은 조건 추가
+
+### Key Metrics
+
+- **Primary:** total optimization time, time-to-target quality
+  - vanilla 수렴 품질 기준 80% / 90% / 95% 도달 wall-clock time (상대값 기준)
+  - 30K iter 고정 시 PSNR/SSIM/LPIPS
+- **Secondary:** retrieval accuracy, alignment success rate, Gaussian count
+
+## Branch Strategy
+
+실험은 **prior insertion representation**을 기준으로 2개 브랜치에서 병렬 진행된다.
+
+| 브랜치 | Prior Representation | 설명 |
+|--------|---------------------|------|
+| `exp/pointcloud` | Point Cloud | geometry-only init. 삽입된 점들이 densification을 통해 Gaussian으로 변환됨 |
+| `exp/gaussian-direct` | Gaussian 집합 | geometry + appearance(SH coefficient 등) 동시 재사용 |
+
+이 분리 자체가 "prior reuse의 어느 수준(geometry only vs geometry+appearance)이 효과적인가"라는 추가 ablation 포인트가 된다. 공통 모듈(`trainer.py`, `metrics.py`)은 양쪽 브랜치에서 동일하게 유지한다. 상세 내용은 `docs/branches.md`를 참조한다.
+
+## Vanilla 3DGS Backend
+
+- 바닐라 3DGS는 개인 fork 레포에 고정하여 사용한다.
+- Fork URL 및 commit hash: 추후 기록 예정
+- `scripts/train_vanilla_3dgs_backend.py`는 실행 시 backend 레포의 commit hash를 로그에 자동 출력한다.
+
 ## Repository Layout
 
 ```text
 PriorProbe3DGS/
 ├── configs/
-│   ├── base/
-│   ├── datasets/
-│   ├── priors/
-│   └── experiments/
+│   ├── base/                  # 프로젝트 공통 설정
+│   │   └── project.yaml
+│   ├── datasets/              # 데이터셋별 설정
+│   │   ├── replica.yaml
+│   │   └── custom_capture.yaml
+│   ├── priors/                # prior 라이브러리 연결 설정
+│   │   └── shapesplat.yaml
+│   └── experiments/           # 실험별 설정
+│       ├── baseline_from_scratch.yaml
+│       ├── oracle_prior.yaml
+│       ├── oracle_alignment.yaml
+│       ├── shapesplat_auto.yaml
+│       ├── domain_incremental.yaml
+│       └── domain_incremental_adapted.yaml
 ├── src/
 │   └── priorprobe/
-│       ├── prior_library/
-│       ├── retrieval/
-│       ├── insertion/
-│       ├── optimization/
-│       ├── evaluation/
-│       └── scene/
+│       ├── __init__.py
+│       ├── prior_library/     # prior 라이브러리 관리 및 증분 추가
+│       ├── retrieval/         # 객체 검색 (OpenCLIP coarse + ShapeSplat fine)
+│       ├── insertion/         # 객체 삽입 및 정렬
+│       ├── optimization/      # 3DGS 최적화 래퍼
+│       ├── evaluation/        # 평가 지표 계산
+│       └── scene/             # 장면 구성 및 occlusion 통제
 ├── scripts/
 ├── notebooks/
 ├── docs/
+│   ├── experiment_design.md   # 실험 설계 상세
+│   ├── branches.md            # 브랜치별 실험 조건
+│   ├── prior_library_spec.md  # prior 라이브러리 구성 명세
+│   └── notes/                 # 연구 노트 및 논의 기록
 ├── manuscript/
-├── outputs/
-├── logs/
-└── tests/
+│   └── outline.md
+├── outputs/                   # 실험 산출물 (gitignored)
+├── logs/                      # 실행 로그 (gitignored)
+├── tests/
+│   └── test_prior_library.py
+├── .gitignore
+├── pyproject.toml
+├── README.md
+└── LICENSE
 ```
 
-## Current Scaffold
+## Directory Intent
 
-- `configs/`에는 baseline, oracle, domain-incremental 실험용 YAML 템플릿이 있다.
-- `src/priorprobe/`에는 prior library, retrieval, insertion, optimization, evaluation, controlled scene용 최소 인터페이스가 있다.
-- `scripts/`에는 prior manifest 생성, 도메인 객체 추가, 실험 실행, 평가, 결과 export용 placeholder CLI가 있다.
-- `scripts/train_vanilla_3dgs_backend.py`는 외부 `gaussian-splatting` 레포를 수정하지 않고 prior-initialized 학습 경로를 붙이는 wrapper다.
-- `configs/datasets/`와 `scripts/resolve_dataset_scene.py`는 ShapeSplat object split, Replica, ScanNet, NeRF Synthetic 같은 공개 데이터셋을 target scene으로 해석하는 템플릿과 점검 CLI를 제공한다.
-- `scripts/check_training_prereqs.py`는 실제 학습 전에 prior placeholder 교체 여부와 Replica/ScanNet subset 준비 상태를 함께 점검한다.
-- `tests/`에는 prior library manifest round-trip을 검증하는 기본 테스트가 있다.
+- **`src/priorprobe/prior_library`** — ShapeSplat 기반 prior index를 관리한다. 도메인 객체를 증분 추가하는 로직과 각 객체의 보조 메타데이터(크기 정보 등)를 여기서 처리한다.
+- **`src/priorprobe/retrieval`** — OpenCLIP(coarse) + ShapeSplat feature(fine) 2단계 매칭으로 prior를 검색한다. oracle retrieval 조건도 여기서 구현한다.
+- **`src/priorprobe/insertion`** — 검색된 prior를 장면에 삽입하고 pose를 정렬한다. oracle alignment과 자동 alignment을 분리하여 제공한다.
+- **`src/priorprobe/optimization`** — from-scratch 3DGS와 prior-initialized 3DGS 학습 루프를 공통 인터페이스로 감싼다. optimizer, densification, learning rate schedule은 모든 비교군에서 동일하게 유지한다.
+- **`src/priorprobe/evaluation`** — 핵심 지표(total time, time-to-target quality)와 보조 지표를 계산한다.
+- **`src/priorprobe/scene`** — controlled scene 설정과 occlusion 수준 정량화를 담당한다.
+- **`configs/experiments`** — 비교군 6개에 대응하는 실험 설정 파일을 두어 재현성을 보장한다.
+- **`docs`** — 실험 설계 결정, 브랜치 전략, prior 라이브러리 명세를 기록한다.
+- **`manuscript`** — 논문 작성을 위한 초안과 메모를 관리한다.
 
-## Quick Start
+## Workflow
+
+```
+Input Images → SfM → Object Segmentation → Feature Extraction
+                                                    ↓
+                                        Prior Library (ShapeSplat + domain objects)
+                                                    ↓
+                                    Object Retrieval (OpenCLIP coarse → ShapeSplat fine)
+                                                    ↓
+                                        Object Insertion & Alignment (or oracle)
+                                                    ↓
+                                    Scene Composition (prior Gaussians + background)
+                                                    ↓
+                                            Joint Optimization
+                                                    ↓
+                                    Evaluation (time, quality, diagnostics)
+```
+
+## Relationship to ReCompose3D
+
+| | PriorProbe3DGS (1단계) | ReCompose3D (2단계) |
+|---|---|---|
+| **질문** | prior 재사용이 효과가 있는가? | prior + 가속축 결합이 시스템 수준에서 유효한가? |
+| **장면** | controlled (단순 배경, 소수 객체) | 복잡한 실내 (clutter, 다수 객체) |
+| **prior** | 탐색 및 검증 대상 | 1단계에서 검증된 전략을 고정 |
+| **novelty** | prior 효과 분리 및 진단 | 가속축 결합의 Pareto 분석 |
+| **관계** | 독립 완결 연구 | 1단계 코드를 dependency로 참조 |
+
+## Prerequisites
+
+- Python 3.11+
+- CUDA 12.8
+- PyTorch 2.7+
+- GPU: NVIDIA RTX PRO 4500 32GB 기준
+
+## Getting Started
 
 ```bash
 uv python pin 3.11
 uv sync
 
+# prior 라이브러리 초기화
 uv run python scripts/prepare_prior_library.py --config configs/priors/shapesplat.yaml
+
+# baseline 실험 실행
 uv run python scripts/run_experiment.py --config configs/experiments/baseline_from_scratch.yaml
+
+# oracle prior 실험 실행
 uv run python scripts/run_experiment.py --config configs/experiments/oracle_prior.yaml
 
 # vanilla 3DGS backend dry-run 예시
@@ -63,23 +180,12 @@ uv run python scripts/run_experiment.py \
   --dataset-scene-id room_0 \
   --dataset-root /abs/path/to/replica_colmap \
   --dry-run
-
-# dataset config 해석 확인
-uv run python scripts/resolve_dataset_scene.py \
-  --config configs/datasets/scannet.yaml \
-  --scene-id scene0000_00
-
-# 실제 학습 전 준비 상태 확인
-uv run python scripts/check_training_prereqs.py
 ```
 
-## Notes
+## Citation
 
-- 상세한 연구 배경과 1단계/2단계 관계는 `PriorProbe3DGS_README.md` 및 `research_plan.md`에 정리되어 있다.
-- 현재 스크립트는 연구 흐름을 고정하기 위한 scaffold이며, 실제 3DGS 학습 코드는 이후 단계에서 연결하면 된다.
-- PyTorch는 공식 `cu128` wheel index에 고정되어 있어 `uv sync` 시 CUDA 12.8 빌드가 설치된다.
-- vanilla 3DGS prior-init 경로는 외부 `../3DGS/gaussian-splatting`와 그 전용 Python 환경을 사용한다.
-- `configs/datasets/`의 dataset은 reconstruction target용이다. prior source는 `configs/priors/shapesplat.yaml`에서 따로 관리한다.
-- `configs/experiments/*vanilla_3dgs.yaml`의 `model_path`는 placeholder로 두고, 실제 기본 출력 경로는 `outputs/backend_runs/<experiment>/<scene_id>`로 자동 생성되게 맞춰뒀다.
-- `data/priors/shapesplat/*.ply`는 스캐폴드 검증용 placeholder prior다. 실제 ShapeSplat export를 확보하면 같은 경로에 교체하면 된다.
-- `data/` 아래에는 raw download root와 processed 3DGS subset root를 모두 scaffold로 잡아뒀다. 실데이터는 계속 git ignore되고 README, `.gitkeep`, `scene_meta.json` 템플릿만 추적된다.
+관련 문의는 GitHub Issues를 통해 가능하다.
+
+## License
+
+TBD

@@ -111,9 +111,36 @@
 
 이 순서를 따르면, 중간에 결과가 나쁘더라도 어느 단계에서 병목이 생기는지 단계적으로 진단할 수 있다.
 
+### Oracle Prior 3단계 세분화
+
+Oracle prior 실험은 아래 3개 조건으로 단계적으로 설계한다.
+
+| 조건 | 설명 | 측정 목적 |
+|------|------|-----------|
+| **A: Oracle Prior + Oracle Alignment** | 데이터셋에서 객체를 별도 학습 → 해당 객체가 있던 위치에 GT pose로 삽입 | prior 재사용의 **이론적 상한선** (ceiling) |
+| **B: 동일 객체 lib 보유 + 자동 retrieval/insertion** | 동일 객체가 lib에 존재하는 상태에서 자동 파이프라인으로 탐색·삽입 | 자동화 파이프라인의 **이상적 조건 성능** |
+| **C: 동일 객체 lib 미보유 (해당 객체만 제거)** | lib에서 target 객체를 제거하고 유사 객체로 매칭 | **현실적 시나리오** 성능 |
+
+진단 흐름: A → B 비교는 자동화 파이프라인의 gap을, B → C 비교는 retrieval의 실제 robustness를 측정한다.
+
+조건 A는 데이터셋 내 객체를 독립 학습하여 oracle prior를 생성하므로 information leakage 가능성이 있다. 이 조건은 **이론적 상한선 참조용**이므로 실험의 주요 결론에 영향을 주지 않는다. 실험 설계 문서에 disclaimer로 명시한다.
+
 ### 6.6 insertion의 취급
 
 1단계에서 insertion은 독립 연구 주제가 아니라 통제변수 또는 보조 모듈로 둔다. insertion은 가능한 한 고정된 방법으로 처리하고, oracle alignment를 통해 상한선을 함께 측정한다. optimizer, learning rate schedule, densification policy 역시 모든 비교군에서 동일하게 유지하여 prior 효과만 먼저 식별한다.
+
+### 6.7 Retrieval 전략
+
+Retrieval은 **2단계 매칭 구조**를 채택한다.
+
+| 단계 | 방법 | 설명 |
+|------|------|------|
+| 1단계 (Coarse) | OpenCLIP (ViT-B/32 또는 ViT-L/14) | image embedding 기반 cosine similarity로 카테고리 분류 |
+| 2단계 (Fine) | ShapeSplat pretrained feature | feature space에서 nearest neighbor로 형상 유사도 기반 최종 매칭 |
+
+1단계를 과도하게 정교하게 만들면 "간단한 retrieval로도 prior reuse가 효과적이다"라는 더 강한 메시지를 놓친다. 1단계 coarse retrieval의 단순성은 의도적인 설계 선택이다.
+
+mean_rgb 방식은 조명 변화에 취약하고 형상 정보가 없어 주력으로는 부적합하며, 보조 baseline으로만 활용 가능하다.
 
 ## 7. 실험 설계 요약
 
@@ -131,7 +158,16 @@
 
 **핵심 지표:**
 - total optimization time
-- time-to-target quality
+- time-to-target quality — 아래 4개 지표로 측정
+
+| # | 지표 | 설명 |
+|---|------|------|
+| 1 | **상대 품질 threshold 도달 시간** | vanilla 수렴 품질의 80%, 90%, 95% 각각에 도달하는 wall-clock time 비교 |
+| 2 | **최종 수렴 품질 도달 가능 여부** | prior 삽입이 local minimum에 빠뜨려서 최종 품질 자체가 떨어지는지 확인 |
+| 3 | **30K iter 고정 시 품질** | 고정 iteration budget에서의 PSNR/SSIM/LPIPS 비교 |
+| 4 | **동일 wall-clock time 고정 시 품질** (보조) | prior 삽입으로 per-iteration 비용이 변할 수 있으므로, 동일 시간 기준 비교 추가 |
+
+threshold는 절대값 대신 상대값을 사용한다. 장면마다 달성 가능한 최대 품질이 다르기 때문이다. 지표 3과 4를 분리하는 이유는 Gaussian 수가 초기부터 많으면 렌더링/backward 비용이 증가하여 iter 기준과 시간 기준 결과가 다를 수 있기 때문이다.
 
 **보조 지표:**
 - convergence iteration 수
