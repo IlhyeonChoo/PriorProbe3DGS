@@ -49,6 +49,12 @@ class Vanilla3DGSBackendConfig:
     prior_lr_scale: float = 0.05
     protect_prior_from_prune: bool = True
     protect_prior_from_densify: bool = True
+    prior_sh_reset_mode: str = "none"
+    prior_target_total_gaussians: int = 0
+    prior_subsample_seed: int = 42
+    sfm_region_replacement_mode: str = "none"
+    sfm_region_margin_scale: float = 1.05
+    sfm_region_margin_min_m: float = 0.02
     save_initial_snapshot: bool = False
     initial_render_sets: tuple[str, ...] = ()
     extra_args: tuple[str, ...] = ()
@@ -117,6 +123,12 @@ class Vanilla3DGSBackendConfig:
             prior_lr_scale=float(payload.get("prior_lr_scale", 0.05)),
             protect_prior_from_prune=bool(payload.get("protect_prior_from_prune", True)),
             protect_prior_from_densify=bool(payload.get("protect_prior_from_densify", True)),
+            prior_sh_reset_mode=str(payload.get("prior_sh_reset_mode", "none")),
+            prior_target_total_gaussians=int(payload.get("prior_target_total_gaussians", 0)),
+            prior_subsample_seed=int(payload.get("prior_subsample_seed", 42)),
+            sfm_region_replacement_mode=str(payload.get("sfm_region_replacement_mode", "none")),
+            sfm_region_margin_scale=float(payload.get("sfm_region_margin_scale", 1.05)),
+            sfm_region_margin_min_m=float(payload.get("sfm_region_margin_min_m", 0.02)),
             save_initial_snapshot=bool(artifacts_payload.get("save_initial_snapshot", False)),
             initial_render_sets=_as_str_tuple(artifacts_payload.get("initial_render_sets")),
             extra_args=_as_str_tuple(payload.get("extra_args")),
@@ -193,6 +205,12 @@ def build_train_command(
     if prior_ply is not None or prior_spec_json is not None:
         command.extend(["--prior-protection-mode", config.prior_protection_mode])
         command.extend(["--prior-lr-scale", str(config.prior_lr_scale)])
+        command.extend(["--prior-sh-reset-mode", config.prior_sh_reset_mode])
+        command.extend(["--prior-target-total-gaussians", str(config.prior_target_total_gaussians)])
+        command.extend(["--prior-subsample-seed", str(config.prior_subsample_seed)])
+        command.extend(["--sfm-region-replacement-mode", config.sfm_region_replacement_mode])
+        command.extend(["--sfm-region-margin-scale", str(config.sfm_region_margin_scale)])
+        command.extend(["--sfm-region-margin-min-m", str(config.sfm_region_margin_min_m)])
         command.append(
             "--protect-prior-from-prune"
             if config.protect_prior_from_prune

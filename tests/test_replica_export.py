@@ -14,6 +14,9 @@ if str(SRC) not in sys.path:
 from priorprobe.replica_export import (
     CameraFrame,
     accepted_azimuth_histogram,
+    accepted_axis_counts,
+    accepted_forward_histogram,
+    assign_test_indices_stratified_azimuth,
     select_largest_target,
     select_multi_object_candidate_infos,
     select_top_targets,
@@ -192,3 +195,136 @@ def test_select_multi_object_candidate_infos_diverse_azimuth_spreads_views() -> 
 
     assert len(selected) == 4
     assert sum(1 for count in histogram if count > 0) >= 3
+
+
+def test_select_multi_object_candidate_infos_roomwide_v2_limits_bin_bias() -> None:
+    focus_center = np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
+    candidate_infos = []
+    # Heavily biased score distribution toward +X / -X bins.
+    for index, position in enumerate(
+        [
+            [2.0, 0.0, 0.0],
+            [1.8, 0.1, 0.0],
+            [1.7, -0.1, 0.0],
+            [0.0, 2.0, 0.0],
+            [-2.0, 0.0, 0.0],
+            [-1.8, 0.1, 0.0],
+            [0.0, -2.0, 0.0],
+            [1.4, 1.4, 0.0],
+        ]
+    ):
+        candidate_infos.append(
+            {
+                "position": np.asarray(position, dtype=np.float32),
+                "rotation": np.eye(3, dtype=np.float32),
+                "visible_ratios": {9: 0.02 if index < 2 else 0.0},
+                "union_visible_ratio": 0.0,
+                "scene_visible_ratio": [0.99, 0.98, 0.97, 0.45, 0.50, 0.49, 0.44, 0.43][index],
+            }
+        )
+
+    selected = select_multi_object_candidate_infos(
+        candidate_infos,
+        total_views=6,
+        target_ids=[9],
+        focus_center=focus_center,
+        selection_mode="room_wide_balanced_azimuth_v2",
+        azimuth_bin_count=8,
+    )
+    frames = [
+        CameraFrame(
+            image_name=f"{index:05d}.png",
+            position=np.asarray(item["position"], dtype=np.float32),
+            rotation_cam2world=np.asarray(item["rotation"], dtype=np.float32),
+            visible_ratio=float(item["scene_visible_ratio"]),
+            split="train",
+        )
+        for index, item in enumerate(selected)
+    ]
+    histogram = accepted_azimuth_histogram(frames, focus_center, bin_count=8)
+
+    assert len(selected) == 6
+    assert max(histogram) <= 2
+    assert sum(1 for count in histogram if count > 0) >= 4
+
+
+def test_assign_test_indices_stratified_azimuth_preserves_bins() -> None:
+    focus_center = np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
+    frames = []
+    positions = (
+        [[2.0, 0.0, 0.0]] * 4
+        + [[0.0, 2.0, 0.0]] * 4
+        + [[-2.0, 0.0, 0.0]] * 4
+        + [[0.0, -2.0, 0.0]] * 4
+    )
+    rotations = [
+        np.asarray(
+            [
+                [0.0, 0.0, -1.0],
+                [1.0, 0.0, 0.0],
+                [0.0, -1.0, 0.0],
+            ],
+            dtype=np.float32,
+        )
+    ] * len(positions)
+    for index, (position, rotation) in enumerate(zip(positions, rotations, strict=True)):
+        frames.append(
+            CameraFrame(
+                image_name=f"{index:05d}.png",
+                position=np.asarray(position, dtype=np.float32),
+                rotation_cam2world=rotation,
+                visible_ratio=1.0,
+                split="train",
+            )
+        )
+
+    test_indices = assign_test_indices_stratified_azimuth(
+        frames,
+        test_views=4,
+        focus_center=focus_center,
+        azimuth_bin_count=4,
+    )
+
+    test_frames = [frame for index, frame in enumerate(frames) if index in test_indices]
+    train_frames = [frame for index, frame in enumerate(frames) if index not in test_indices]
+    assert len(test_frames) == 4
+    assert accepted_azimuth_histogram(test_frames, focus_center, bin_count=4) == [1, 1, 1, 1]
+    assert accepted_azimuth_histogram(train_frames, focus_center, bin_count=4) == [3, 3, 3, 3]
+
+
+def test_camera_distribution_helpers_count_forward_and_axis() -> None:
+    frames = [
+        CameraFrame(
+            image_name="00000.png",
+            position=np.asarray([1.0, 0.0, 0.0], dtype=np.float32),
+            rotation_cam2world=np.asarray(
+                [
+                    [0.0, 0.0, 1.0],
+                    [1.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0],
+                ],
+                dtype=np.float32,
+            ),
+            visible_ratio=1.0,
+            split="train",
+        ),
+        CameraFrame(
+            image_name="00001.png",
+            position=np.asarray([0.0, 1.0, 0.0], dtype=np.float32),
+            rotation_cam2world=np.asarray(
+                [
+                    [1.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0],
+                    [0.0, -1.0, 0.0],
+                ],
+                dtype=np.float32,
+            ),
+            visible_ratio=1.0,
+            split="train",
+        ),
+    ]
+
+    assert sum(accepted_forward_histogram(frames, bin_count=8)) == 2
+    axis_counts = accepted_axis_counts(frames)
+    assert axis_counts["ew"] == 1
+    assert axis_counts["ns"] == 1

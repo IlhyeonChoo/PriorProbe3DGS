@@ -135,6 +135,13 @@ def write_evaluation(
     return output_path
 
 
+def load_prior_init_metadata(model_path: Path) -> dict[str, Any] | None:
+    metadata_path = model_path / "prior_init" / "metadata.json"
+    if not metadata_path.exists():
+        return None
+    return load_json(metadata_path)
+
+
 def load_scene_oracle_target(scene_root: Path) -> dict[str, Any] | None:
     target_path = scene_root / "oracle" / "target.json"
     if not target_path.exists():
@@ -1027,6 +1034,14 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
             "protect_from_prune": backend_config.protect_prior_from_prune,
             "protect_from_densify": backend_config.protect_prior_from_densify,
         },
+        "prior_insertion": {
+            "sh_reset_mode": backend_config.prior_sh_reset_mode,
+            "target_total_gaussians": backend_config.prior_target_total_gaussians,
+            "subsample_seed": backend_config.prior_subsample_seed,
+            "sfm_region_replacement_mode": backend_config.sfm_region_replacement_mode,
+            "sfm_region_margin_scale": backend_config.sfm_region_margin_scale,
+            "sfm_region_margin_min_m": backend_config.sfm_region_margin_min_m,
+        },
         "status": "dry_run" if backend_config.dry_run else "pending",
         "repo_path": str(backend_config.repo_path),
         "source_path": str(backend_config.source_path),
@@ -1143,6 +1158,30 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
             "stderr_log": str(stderr_path),
         }
     )
+    prior_init_metadata = load_prior_init_metadata(backend_config.model_path)
+    if prior_init_metadata is not None:
+        metadata["prior_init_metadata"] = prior_init_metadata
+        metadata["prior_insertion"].update(
+            {
+                "sh_reset_mode": prior_init_metadata.get(
+                    "prior_sh_reset_mode",
+                    metadata["prior_insertion"]["sh_reset_mode"],
+                ),
+                "target_total_gaussians": prior_init_metadata.get(
+                    "prior_target_total_gaussians",
+                    metadata["prior_insertion"]["target_total_gaussians"],
+                ),
+                "sfm_region_replacement_mode": prior_init_metadata.get(
+                    "sfm_region_replacement_mode",
+                    metadata["prior_insertion"]["sfm_region_replacement_mode"],
+                ),
+                "sfm_removed_point_count": prior_init_metadata.get("sfm_removed_point_count"),
+                "sfm_removed_point_ratio": prior_init_metadata.get("sfm_removed_point_ratio"),
+            }
+        )
+        if prior_init_metadata.get("selected_priors"):
+            metadata["selected_priors"] = list(prior_init_metadata["selected_priors"])
+            metadata["selected_prior"] = metadata["selected_priors"][0]
     write_json(metadata_path, metadata)
 
     if return_code != 0:

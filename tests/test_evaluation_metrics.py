@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+from PIL import Image
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
@@ -32,6 +34,11 @@ def _write_minimal_ply(path: Path, vertex_count: int) -> None:
     )
 
 
+def _write_rgb_image(path: Path, rgb: tuple[int, int, int]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8), color=rgb).save(path)
+
+
 def _load_export_results_module():
     script_path = ROOT / "scripts" / "export_results.py"
     spec = importlib.util.spec_from_file_location("priorprobe_export_results", script_path)
@@ -56,6 +63,9 @@ def test_summarize_backend_run_collects_checkpoint_metrics(tmp_path: Path) -> No
     )
     _write_minimal_ply(model_path / "point_cloud" / "iteration_1000" / "point_cloud.ply", 1234)
     _write_minimal_ply(model_path / "point_cloud" / "iteration_3000" / "point_cloud.ply", 2345)
+    _write_minimal_ply(model_path / "point_cloud" / "iteration_0" / "point_cloud.ply", 777)
+    _write_rgb_image(model_path / "test" / "ours_0" / "renders" / "00000.png", (100, 100, 100))
+    _write_rgb_image(model_path / "test" / "ours_0" / "gt" / "00000.png", (90, 90, 90))
 
     backend_run_path = tmp_path / "backend_run.json"
     backend_run_path.write_text(
@@ -74,7 +84,7 @@ def test_summarize_backend_run_collects_checkpoint_metrics(tmp_path: Path) -> No
         encoding="utf-8",
     )
 
-    summary = summarize_backend_run(backend_run_path, target_psnr=28.0)
+    summary = summarize_backend_run(backend_run_path, target_psnr=28.5)
 
     assert summary.experiment_name == "oracle_prior_vanilla_3dgs"
     assert summary.scene_id == "room_0"
@@ -82,8 +92,10 @@ def test_summarize_backend_run_collects_checkpoint_metrics(tmp_path: Path) -> No
     assert summary.gaussian_count == 2345
     assert summary.retrieval_accuracy == 0.42
     assert summary.time_to_target_quality_sec == 60.0
-    assert [metric.iteration for metric in summary.checkpoint_metrics] == [1000, 3000]
-    assert summary.checkpoint_metrics[0].gaussian_count == 1234
+    assert [metric.iteration for metric in summary.checkpoint_metrics] == [0, 1000, 3000]
+    assert summary.checkpoint_metrics[0].gaussian_count == 777
+    assert summary.checkpoint_metrics[0].psnr is not None
+    assert summary.checkpoint_metrics[0].ssim is not None
 
 
 def test_summarize_backend_run_aggregates_selected_priors(tmp_path: Path) -> None:

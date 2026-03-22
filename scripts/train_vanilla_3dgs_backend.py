@@ -8,7 +8,6 @@ import os
 import shutil
 import sys
 import types
-import zlib
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +59,16 @@ from priorprobe.gaussian_affine import (
     transform_gaussian_vertex,
     transform_positions,
 )
+from priorprobe.gaussian_prior_diagnostics import (
+    allocate_total_budget,
+    expanded_aabb_from_positions,
+    gaussian_positions,
+    normalize_prior_sh_reset_mode,
+    point_keep_mask_outside_aabbs,
+    reset_gaussian_sh,
+    stable_seed,
+    subsample_structured_vertex,
+)
 from priorprobe.result_ply_naming import ensure_named_point_cloud, infer_experiment_name
 
 train_module = importlib.import_module("train")
@@ -80,6 +89,13 @@ def normalize_prior_protection_mode(value: str | None) -> str:
     normalized = str(value or "none").strip().lower()
     if normalized not in {"none", "freeze", "weak"}:
         raise ValueError(f"Unsupported prior protection mode: {value!r}")
+    return normalized
+
+
+def normalize_sfm_region_replacement_mode(value: str | None) -> str:
+    normalized = str(value or "none").strip().lower()
+    if normalized not in {"none", "aligned_prior_aabb_union"}:
+        raise ValueError(f"Unsupported SfM region replacement mode: {value!r}")
     return normalized
 
 
@@ -584,15 +600,13 @@ def merge_point_clouds(base_pcd, prior_pcd):
     return dataset_readers.BasicPointCloud(points=xyz, colors=colors, normals=normals)
 
 
-def _stable_seed(prepared_item: dict[str, Any]) -> int:
-    payload = "::".join(
-        [
-            str(prepared_item.get("target_object_id", "")),
-            str(prepared_item.get("prior_object_id", "")),
-            str(prepared_item.get("aligned_prior", "")),
-        ]
+def prior_sample_seed(prepared_item: dict[str, Any], *, base_seed: int) -> int:
+    return stable_seed(
+        int(base_seed),
+        prepared_item.get("target_object_id", ""),
+        prepared_item.get("prior_object_id", ""),
+        prepared_item.get("aligned_prior", ""),
     )
-    return int(zlib.crc32(payload.encode("utf-8")) & 0xFFFFFFFF)
 
 
 def subsample_point_cloud(point_cloud, *, keep_ratio: float, seed: int):
@@ -641,7 +655,7 @@ def apply_insertion_policy(prior_pcd, prepared_item: dict[str, Any], *, init_mod
         sampled_pcd, original_count, kept_count = subsample_point_cloud(
             prior_pcd,
             keep_ratio=requested_keep_ratio,
-            seed=_stable_seed(updated),
+            seed=prior_sample_seed(updated, base_seed=0),
         )
         updated["applied_point_keep_ratio"] = float(kept_count / max(original_count, 1))
         updated["kept_point_count"] = kept_count
@@ -654,7 +668,57 @@ def apply_insertion_policy(prior_pcd, prepared_item: dict[str, Any], *, init_mod
     return prior_pcd, updated
 
 
-def apply_gaussian_insertion_policy(vertex: np.ndarray, prepared_item: dict[str, Any], *, init_mode: str):
+def subsample_basic_point_cloud(point_cloud, *, keep_count: int, seed: int):
+    xyz = np.asarray(point_cloud.points)
+    colors = np.asarray(point_cloud.colors)
+    normals = np.asarray(point_cloud.normals)
+    original_count = int(xyz.shape[0])
+    if original_count == 0:
+        return point_cloud, 0, 0
+    if keep_count <= 0:
+        sampled = dataset_readers.BasicPointCloud(
+            points=xyz[:0],
+            colors=colors[:0],
+            normals=normals[:0],
+        )
+        return sampled, original_count, 0
+    if keep_count >= original_count:
+        return point_cloud, original_count, original_count
+
+    rng = np.random.default_rng(seed)
+    indices = np.sort(rng.choice(original_count, size=int(keep_count), replace=False))
+    sampled = dataset_readers.BasicPointCloud(
+        points=xyz[indices],
+        colors=colors[indices],
+        normals=normals[indices],
+    )
+    return sampled, original_count, int(keep_count)
+
+
+def filter_basic_point_cloud_outside_aabbs(base_pcd, aabbs: list[tuple[np.ndarray, np.ndarray]]):
+    xyz = np.asarray(base_pcd.points)
+    colors = np.asarray(base_pcd.colors)
+    normals = np.asarray(base_pcd.normals)
+    keep_mask = point_keep_mask_outside_aabbs(xyz.astype(np.float32, copy=False), aabbs)
+    filtered = dataset_readers.BasicPointCloud(
+        points=xyz[keep_mask],
+        colors=colors[keep_mask],
+        normals=normals[keep_mask],
+    )
+    removed_count = int(xyz.shape[0] - keep_mask.sum())
+    removed_ratio = float(removed_count / max(int(xyz.shape[0]), 1))
+    return filtered, removed_count, removed_ratio
+
+
+def apply_gaussian_insertion_policy(
+    vertex: np.ndarray,
+    prepared_item: dict[str, Any],
+    *,
+    init_mode: str,
+    keep_count_override: int | None,
+    sh_reset_mode: str,
+    base_seed: int,
+):
     updated = dict(prepared_item)
     raw_score = updated.get("prior_score")
     normalized_confidence = float(updated.get("normalized_confidence", 1.0) or 0.0)
@@ -666,6 +730,7 @@ def apply_gaussian_insertion_policy(vertex: np.ndarray, prepared_item: dict[str,
     updated["normalized_confidence"] = normalized_confidence
     updated["requested_point_keep_ratio"] = requested_keep_ratio
     updated["original_point_count"] = original_count
+    updated["prior_sh_reset_mode"] = normalize_prior_sh_reset_mode(sh_reset_mode)
 
     if dropped:
         updated["applied_point_keep_ratio"] = 0.0
@@ -676,10 +741,18 @@ def apply_gaussian_insertion_policy(vertex: np.ndarray, prepared_item: dict[str,
     if init_mode != "merge":
         raise ValueError("Gaussian priors currently support init_mode='merge' or init_mode='replace' only")
 
-    updated["applied_point_keep_ratio"] = 1.0
-    updated["kept_point_count"] = original_count
+    processed = reset_gaussian_sh(vertex, mode=sh_reset_mode)
+    keep_count = original_count if keep_count_override is None else int(np.clip(keep_count_override, 0, original_count))
+    if keep_count < original_count:
+        processed = subsample_structured_vertex(
+            processed,
+            keep_count=keep_count,
+            seed=prior_sample_seed(updated, base_seed=base_seed),
+        )
+    updated["applied_point_keep_ratio"] = float(keep_count / max(original_count, 1))
+    updated["kept_point_count"] = int(processed.shape[0])
     updated["dropped"] = False
-    return vertex, updated
+    return processed, updated
 
 
 def initialize_loaded_prior(gaussians, train_cam_infos, cameras_extent: float) -> None:
@@ -779,10 +852,20 @@ def write_prior_metadata(
     selected_priors: list[dict[str, Any]],
     init_mode: str,
     prior_protection: dict[str, Any] | None = None,
+    prior_sh_reset_mode: str = "none",
+    prior_target_total_gaussians: int = 0,
+    sfm_region_replacement_mode: str = "none",
+    sfm_removed_point_count: int | None = None,
+    sfm_removed_point_ratio: float | None = None,
 ) -> None:
     metadata = {
         "selected_priors": selected_priors,
         "init_mode": init_mode,
+        "prior_sh_reset_mode": str(prior_sh_reset_mode),
+        "prior_target_total_gaussians": int(prior_target_total_gaussians),
+        "sfm_region_replacement_mode": str(sfm_region_replacement_mode),
+        "sfm_removed_point_count": int(sfm_removed_point_count) if sfm_removed_point_count is not None else None,
+        "sfm_removed_point_ratio": float(sfm_removed_point_ratio) if sfm_removed_point_ratio is not None else None,
     }
     if prior_protection is not None:
         metadata["prior_protection"] = prior_protection
@@ -905,6 +988,16 @@ def propagate_prior_runtime_args(dataset: Any, args: argparse.Namespace) -> None
         setattr(dataset, "selected_priors_metadata", list(getattr(args, "selected_priors_metadata")))
     setattr(dataset, "prior_protection_mode", str(getattr(args, "prior_protection_mode", "none")))
     setattr(dataset, "prior_lr_scale", float(getattr(args, "prior_lr_scale", 0.05)))
+    setattr(dataset, "prior_sh_reset_mode", str(getattr(args, "prior_sh_reset_mode", "none")))
+    setattr(dataset, "prior_target_total_gaussians", int(getattr(args, "prior_target_total_gaussians", 0)))
+    setattr(dataset, "prior_subsample_seed", int(getattr(args, "prior_subsample_seed", 42)))
+    setattr(
+        dataset,
+        "sfm_region_replacement_mode",
+        str(getattr(args, "sfm_region_replacement_mode", "none")),
+    )
+    setattr(dataset, "sfm_region_margin_scale", float(getattr(args, "sfm_region_margin_scale", 1.05)))
+    setattr(dataset, "sfm_region_margin_min_m", float(getattr(args, "sfm_region_margin_min_m", 0.02)))
     setattr(dataset, "protect_prior_from_prune", bool(getattr(args, "protect_prior_from_prune", True)))
     setattr(dataset, "protect_prior_from_densify", bool(getattr(args, "protect_prior_from_densify", True)))
 
@@ -917,6 +1010,9 @@ def make_prior_init_scene():
             self.model_path = args.model_path
             self.loaded_iter = None
             self.gaussians = gaussians
+            self._prior_protection_mode = str(getattr(args, "prior_protection_mode", "none"))
+            self._protect_prior_from_prune = bool(getattr(args, "protect_prior_from_prune", False))
+            self._protect_prior_from_densify = bool(getattr(args, "protect_prior_from_densify", False))
 
             if load_iteration:
                 if load_iteration == -1:
@@ -1051,6 +1147,14 @@ def make_prior_init_scene():
             elif prepared_init_plys:
                 init_mode = getattr(args, "init_mode", "merge")
                 protection_config = build_prior_protection_config(args)
+                prior_sh_reset_mode = normalize_prior_sh_reset_mode(getattr(args, "prior_sh_reset_mode", "none"))
+                prior_target_total_gaussians = max(int(getattr(args, "prior_target_total_gaussians", 0)), 0)
+                prior_subsample_seed = int(getattr(args, "prior_subsample_seed", 42))
+                sfm_region_replacement_mode = normalize_sfm_region_replacement_mode(
+                    getattr(args, "sfm_region_replacement_mode", "none")
+                )
+                sfm_region_margin_scale = float(getattr(args, "sfm_region_margin_scale", 1.05))
+                sfm_region_margin_min_m = float(getattr(args, "sfm_region_margin_min_m", 0.02))
                 if init_mode == "replace":
                     if len(prepared_init_plys) != 1:
                         raise ValueError("replace init_mode supports exactly one prepared prior")
@@ -1080,12 +1184,19 @@ def make_prior_init_scene():
                         selected_priors=current_selected_priors,
                         init_mode=init_mode,
                         prior_protection=protection_config,
+                        prior_sh_reset_mode=prior_sh_reset_mode,
+                        prior_target_total_gaussians=prior_target_total_gaussians,
+                        sfm_region_replacement_mode=sfm_region_replacement_mode,
                     )
                 elif init_mode in {"merge", "weighted_merge", "filtered_merge"}:
                     merged_pcd = scene_info.point_cloud
                     base_point_count = int(np.asarray(scene_info.point_cloud.points).shape[0])
                     current_point_index = base_point_count
+                    sfm_removed_point_count = 0
+                    sfm_removed_point_ratio = 0.0
                     gaussian_vertices_to_append: list[tuple[np.ndarray, dict[str, Any]]] = []
+                    gaussian_original_counts: list[int] = []
+                    gaussian_raw_entries: list[tuple[np.ndarray, dict[str, Any]]] = []
                     updated_selected_priors: list[dict[str, Any]] = []
                     for init_path_value, init_format in zip(prepared_init_plys, prepared_init_formats):
                         index = len(updated_selected_priors)
@@ -1102,20 +1213,8 @@ def make_prior_init_scene():
                                 PlyData.read(Path(init_path_value))["vertex"].data,
                                 copy=True,
                             )
-                            filtered_vertex, updated_item = apply_gaussian_insertion_policy(
-                                gaussian_vertex,
-                                metadata_item,
-                                init_mode=init_mode,
-                            )
-                            if filtered_vertex is None:
-                                updated_item["protected_index_start"] = None
-                                updated_item["protected_index_end"] = None
-                                updated_item["protected_point_count"] = 0
-                                updated_selected_priors.append(updated_item)
-                                continue
-                            updated_item["protected_point_count"] = int(filtered_vertex.shape[0])
-                            gaussian_vertices_to_append.append((filtered_vertex, updated_item))
-                            updated_selected_priors.append(updated_item)
+                            gaussian_original_counts.append(int(gaussian_vertex.shape[0]))
+                            gaussian_raw_entries.append((gaussian_vertex, metadata_item))
                             continue
 
                         prior_pcd = prepared_asset_to_point_cloud(Path(init_path_value), init_format)
@@ -1137,6 +1236,50 @@ def make_prior_init_scene():
                         current_point_index += kept_point_count
                         updated_selected_priors.append(updated_item)
                         merged_pcd = merge_point_clouds(merged_pcd, filtered_pcd)
+                    gaussian_keep_counts = allocate_total_budget(
+                        gaussian_original_counts,
+                        prior_target_total_gaussians,
+                    )
+                    if prior_target_total_gaussians <= 0:
+                        gaussian_keep_counts = [None for _ in gaussian_original_counts]
+                    for gaussian_index, (gaussian_vertex, metadata_item) in enumerate(gaussian_raw_entries):
+                        keep_override = (
+                            gaussian_keep_counts[gaussian_index]
+                            if gaussian_index < len(gaussian_keep_counts)
+                            else None
+                        )
+                        filtered_vertex, updated_item = apply_gaussian_insertion_policy(
+                            gaussian_vertex,
+                            metadata_item,
+                            init_mode=init_mode,
+                            keep_count_override=keep_override,
+                            sh_reset_mode=prior_sh_reset_mode,
+                            base_seed=prior_subsample_seed,
+                        )
+                        if filtered_vertex is None:
+                            updated_item["protected_index_start"] = None
+                            updated_item["protected_index_end"] = None
+                            updated_item["protected_point_count"] = 0
+                            updated_selected_priors.append(updated_item)
+                            continue
+                        updated_item["protected_point_count"] = int(filtered_vertex.shape[0])
+                        gaussian_vertices_to_append.append((filtered_vertex, updated_item))
+                        updated_selected_priors.append(updated_item)
+                    if gaussian_vertices_to_append and sfm_region_replacement_mode == "aligned_prior_aabb_union":
+                        aabbs = [
+                            expanded_aabb_from_positions(
+                                gaussian_positions(vertex),
+                                margin_scale=sfm_region_margin_scale,
+                                margin_min_m=sfm_region_margin_min_m,
+                            )
+                            for vertex, _ in gaussian_vertices_to_append
+                            if int(vertex.shape[0]) > 0
+                        ]
+                        if aabbs:
+                            merged_pcd, sfm_removed_point_count, sfm_removed_point_ratio = filter_basic_point_cloud_outside_aabbs(
+                                merged_pcd,
+                                aabbs,
+                            )
                     self.gaussians.create_from_pcd(merged_pcd, train_cam_infos, self.cameras_extent)
                     current_gaussian_index = int(self.gaussians.get_xyz.shape[0])
                     for gaussian_vertex, updated_item in gaussian_vertices_to_append:
@@ -1157,6 +1300,11 @@ def make_prior_init_scene():
                             selected_priors=updated_selected_priors,
                             init_mode=init_mode,
                             prior_protection=protection_config,
+                            prior_sh_reset_mode=prior_sh_reset_mode,
+                            prior_target_total_gaussians=prior_target_total_gaussians,
+                            sfm_region_replacement_mode=sfm_region_replacement_mode,
+                            sfm_removed_point_count=sfm_removed_point_count,
+                            sfm_removed_point_ratio=sfm_removed_point_ratio,
                         )
                 else:
                     raise ValueError(f"Unsupported init_mode: {init_mode}")
@@ -1172,9 +1320,9 @@ def make_prior_init_scene():
                 iteration_dir=point_cloud_path,
                 experiment_name=infer_experiment_name(Path(self.model_path)),
                 iteration=int(iteration),
-                protection_mode=str(getattr(args, "prior_protection_mode", "none")),
-                protect_from_prune=bool(getattr(args, "protect_prior_from_prune", False)),
-                protect_from_densify=bool(getattr(args, "protect_prior_from_densify", False)),
+                protection_mode=self._prior_protection_mode,
+                protect_from_prune=self._protect_prior_from_prune,
+                protect_from_densify=self._protect_prior_from_densify,
             )
             write_prior_protection_checkpoint(Path(self.model_path), int(iteration), self.gaussians)
             exposure_dict = {
@@ -1263,6 +1411,17 @@ def build_parser() -> tuple[argparse.ArgumentParser, Any, Any, Any]:
         choices=["none", "freeze", "weak"],
     )
     parser.add_argument("--prior-lr-scale", type=float, default=0.05)
+    parser.add_argument("--prior-sh-reset-mode", type=str, default="none", choices=["none", "zero_all"])
+    parser.add_argument("--prior-target-total-gaussians", type=int, default=0)
+    parser.add_argument("--prior-subsample-seed", type=int, default=42)
+    parser.add_argument(
+        "--sfm-region-replacement-mode",
+        type=str,
+        default="none",
+        choices=["none", "aligned_prior_aabb_union"],
+    )
+    parser.add_argument("--sfm-region-margin-scale", type=float, default=1.05)
+    parser.add_argument("--sfm-region-margin-min-m", type=float, default=0.02)
     parser.add_argument("--protect-prior-from-prune", action="store_true", default=True)
     parser.add_argument("--no-protect-prior-from-prune", dest="protect_prior_from_prune", action="store_false")
     parser.add_argument("--protect-prior-from-densify", action="store_true", default=True)
@@ -1292,6 +1451,9 @@ def main() -> int:
             model_path,
             selected_priors=prepared,
             init_mode=args.init_mode,
+            prior_sh_reset_mode=args.prior_sh_reset_mode,
+            prior_target_total_gaussians=args.prior_target_total_gaussians,
+            sfm_region_replacement_mode=args.sfm_region_replacement_mode,
         )
     elif args.prior_ply is not None:
         args.prior_ply = args.prior_ply.resolve()
@@ -1322,6 +1484,9 @@ def main() -> int:
             model_path,
             selected_priors=list(args.selected_priors_metadata),
             init_mode=args.init_mode,
+            prior_sh_reset_mode=args.prior_sh_reset_mode,
+            prior_target_total_gaussians=args.prior_target_total_gaussians,
+            sfm_region_replacement_mode=args.sfm_region_replacement_mode,
         )
 
     args.save_iterations.append(args.iterations)

@@ -1,15 +1,26 @@
 from __future__ import annotations
 
+import importlib
 import json
 import re
+import sys
 from dataclasses import dataclass, field
+from functools import lru_cache
+from math import exp
 from pathlib import Path
 from typing import Any
+
+import torch
+import torch.nn.functional as F
+import torchvision.transforms.functional as tvf
+from PIL import Image
 
 from priorprobe.optimization.trainer import TrainingRun
 
 
 _METHOD_PATTERN = re.compile(r"ours_(\d+)$")
+_SSIM_C1 = 0.01 ** 2
+_SSIM_C2 = 0.03 ** 2
 
 
 @dataclass(slots=True)
@@ -121,6 +132,107 @@ def _read_ply_vertex_count(path: Path) -> int | None:
     return None
 
 
+def _gaussian_window(window_size: int, sigma: float) -> torch.Tensor:
+    values = [exp(-((index - window_size // 2) ** 2) / float(2 * sigma ** 2)) for index in range(window_size)]
+    window = torch.tensor(values, dtype=torch.float32)
+    return window / window.sum()
+
+
+def _create_ssim_window(window_size: int, channel: int, *, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+    one_d = _gaussian_window(window_size, 1.5).unsqueeze(1)
+    two_d = one_d.mm(one_d.t()).float().unsqueeze(0).unsqueeze(0)
+    return two_d.expand(channel, 1, window_size, window_size).contiguous().to(device=device, dtype=dtype)
+
+
+def _ssim_metric(img1: torch.Tensor, img2: torch.Tensor, window_size: int = 11) -> torch.Tensor:
+    channel = img1.size(-3)
+    window = _create_ssim_window(window_size, channel, device=img1.device, dtype=img1.dtype)
+    mu1 = F.conv2d(img1, window, padding=window_size // 2, groups=channel)
+    mu2 = F.conv2d(img2, window, padding=window_size // 2, groups=channel)
+
+    mu1_sq = mu1.pow(2)
+    mu2_sq = mu2.pow(2)
+    mu1_mu2 = mu1 * mu2
+    sigma1_sq = F.conv2d(img1 * img1, window, padding=window_size // 2, groups=channel) - mu1_sq
+    sigma2_sq = F.conv2d(img2 * img2, window, padding=window_size // 2, groups=channel) - mu2_sq
+    sigma12 = F.conv2d(img1 * img2, window, padding=window_size // 2, groups=channel) - mu1_mu2
+
+    ssim_map = ((2 * mu1_mu2 + _SSIM_C1) * (2 * sigma12 + _SSIM_C2)) / (
+        (mu1_sq + mu2_sq + _SSIM_C1) * (sigma1_sq + sigma2_sq + _SSIM_C2)
+    )
+    return ssim_map.mean()
+
+
+def _psnr_metric(img1: torch.Tensor, img2: torch.Tensor) -> torch.Tensor:
+    mse = (((img1 - img2)) ** 2).view(img1.shape[0], -1).mean(1, keepdim=True)
+    return 20 * torch.log10(1.0 / torch.sqrt(mse))
+
+
+@lru_cache(maxsize=8)
+def _lpips_model(repo_path_str: str, device_type: str):
+    repo_path = Path(repo_path_str)
+    inserted = False
+    if str(repo_path) not in sys.path:
+        sys.path.insert(0, str(repo_path))
+        inserted = True
+    try:
+        module = importlib.import_module("lpipsPyTorch")
+        criterion = module.LPIPS("vgg", "0.1").to(torch.device(device_type))
+        criterion.eval()
+        return criterion
+    finally:
+        if inserted:
+            sys.path.remove(str(repo_path))
+
+
+def _initial_snapshot_metric(
+    model_path: Path,
+    *,
+    repo_path: Path | None,
+) -> tuple[CheckpointMetric | None, tuple[str, ...]]:
+    warnings: list[str] = []
+    render_dir = model_path / "test" / "ours_0" / "renders"
+    gt_dir = model_path / "test" / "ours_0" / "gt"
+    if not render_dir.exists() or not gt_dir.exists():
+        return None, ()
+
+    names = sorted(path.name for path in render_dir.iterdir() if path.is_file() and (gt_dir / path.name).exists())
+    if not names:
+        return None, (f"missing initial snapshot images: {render_dir}",)
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    lpips_model = None
+    if repo_path is not None and repo_path.exists():
+        try:
+            lpips_model = _lpips_model(str(repo_path.resolve()), device.type)
+        except Exception as exc:
+            warnings.append(f"failed to load LPIPS model for iter_0: {exc}")
+
+    psnr_values: list[float] = []
+    ssim_values: list[float] = []
+    lpips_values: list[float] = []
+    with torch.no_grad():
+        for name in names:
+            render = tvf.to_tensor(Image.open(render_dir / name).convert("RGB")).unsqueeze(0).to(device)
+            gt = tvf.to_tensor(Image.open(gt_dir / name).convert("RGB")).unsqueeze(0).to(device)
+            psnr_values.append(float(_psnr_metric(render, gt).mean().item()))
+            ssim_values.append(float(_ssim_metric(render, gt).item()))
+            if lpips_model is not None:
+                lpips_values.append(float(lpips_model(render, gt).mean().item()))
+
+    point_cloud_path = model_path / "point_cloud" / "iteration_0" / "point_cloud.ply"
+    metric = CheckpointMetric(
+        iteration=0,
+        method="ours_0",
+        psnr=float(sum(psnr_values) / len(psnr_values)) if psnr_values else None,
+        ssim=float(sum(ssim_values) / len(ssim_values)) if ssim_values else None,
+        lpips=float(sum(lpips_values) / len(lpips_values)) if lpips_values else None,
+        gaussian_count=_read_ply_vertex_count(point_cloud_path),
+        estimated_elapsed_sec=0.0,
+    )
+    return metric, tuple(warnings)
+
+
 def _load_checkpoint_metrics(model_path: Path, total_elapsed_sec: float | None) -> tuple[list[CheckpointMetric], tuple[str, ...]]:
     warnings: list[str] = []
     results_path = model_path / "results.json"
@@ -177,9 +289,14 @@ def summarize_backend_run(
 ) -> EvaluationSummary:
     payload = _load_json(backend_run_path)
     model_path = Path(payload["model_path"])
+    repo_path = Path(payload["repo_path"]) if payload.get("repo_path") is not None else None
     total_elapsed_sec = float(payload["elapsed_sec"]) if payload.get("elapsed_sec") is not None else None
     checkpoints, checkpoint_warnings = _load_checkpoint_metrics(model_path, total_elapsed_sec)
-    warnings = list(checkpoint_warnings)
+    initial_checkpoint, initial_warnings = _initial_snapshot_metric(model_path, repo_path=repo_path)
+    warnings = list(checkpoint_warnings) + list(initial_warnings)
+    if initial_checkpoint is not None:
+        checkpoints = [metric for metric in checkpoints if metric.iteration != 0]
+        checkpoints.insert(0, initial_checkpoint)
 
     final_checkpoint = checkpoints[-1] if checkpoints else None
     selected_prior = payload.get("selected_prior") or {}

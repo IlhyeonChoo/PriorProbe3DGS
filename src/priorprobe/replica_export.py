@@ -212,6 +212,15 @@ def compute_scene_focus(targets: list[ReplicaOracleTarget]) -> tuple[np.ndarray,
     return focus_center.astype(np.float32), max(scene_radius, 0.25)
 
 
+def compute_room_bounds(scene_root: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    xyz, _, _, _ = _load_mesh_arrays(scene_root / "mesh.ply")
+    mins = xyz.min(axis=0).astype(np.float32)
+    maxs = xyz.max(axis=0).astype(np.float32)
+    center = ((mins + maxs) * 0.5).astype(np.float32)
+    sizes = (maxs - mins).astype(np.float32)
+    return mins, maxs, center
+
+
 def camera_pose_key(position: np.ndarray) -> tuple[float, ...]:
     return tuple(np.round(np.asarray(position, dtype=np.float32), 4).tolist())
 
@@ -238,6 +247,46 @@ def accepted_azimuth_histogram(
     counts = [0] * max(int(bin_count), 1)
     for frame in frames:
         counts[azimuth_bin_index(frame.position, focus_center, bin_count=bin_count)] += 1
+    return counts
+
+
+def forward_azimuth_bin_index(
+    rotation_cam2world: np.ndarray,
+    *,
+    bin_count: int,
+) -> int:
+    count = max(int(bin_count), 1)
+    forward = np.asarray(rotation_cam2world, dtype=np.float32)[:, 2]
+    angle = math.atan2(float(forward[1]), float(forward[0]))
+    normalized = (angle + math.pi) / (2.0 * math.pi)
+    return int(math.floor(normalized * count)) % count
+
+
+def accepted_forward_histogram(
+    frames: list[CameraFrame],
+    *,
+    bin_count: int,
+) -> list[int]:
+    counts = [0] * max(int(bin_count), 1)
+    for frame in frames:
+        counts[forward_azimuth_bin_index(frame.rotation_cam2world, bin_count=bin_count)] += 1
+    return counts
+
+
+def accepted_axis_counts(frames: list[CameraFrame]) -> dict[str, int]:
+    counts = {"ns": 0, "ew": 0, "other": 0}
+    for frame in frames:
+        forward = np.asarray(frame.rotation_cam2world, dtype=np.float32)[:, 2]
+        forward_xy = forward[:2]
+        if float(np.linalg.norm(forward_xy)) == 0.0:
+            counts["other"] += 1
+            continue
+        if abs(float(forward_xy[0])) > abs(float(forward_xy[1])) * 1.5:
+            counts["ew"] += 1
+        elif abs(float(forward_xy[1])) > abs(float(forward_xy[0])) * 1.5:
+            counts["ns"] += 1
+        else:
+            counts["other"] += 1
     return counts
 
 
@@ -268,6 +317,108 @@ def generate_scene_orbit_camera_poses(
     return poses
 
 
+def generate_room_wide_camera_poses(
+    scene_root: Path,
+    *,
+    count: int,
+    seed: int,
+    radius_min: float,
+    radius_max: float,
+) -> tuple[list[tuple[np.ndarray, np.ndarray]], np.ndarray, np.ndarray]:
+    mins, maxs, room_center = compute_room_bounds(scene_root)
+    room_sizes = (maxs - mins).astype(np.float32)
+    room_xy_diag = float(np.linalg.norm(room_sizes[:2]))
+    room_height = float(room_sizes[2])
+    up = np.asarray([0.0, 0.0, 1.0], dtype=np.float32)
+    rng = np.random.default_rng(seed)
+    base_radius = float(np.clip(room_xy_diag * 0.35, radius_min, radius_max))
+    poses: list[tuple[np.ndarray, np.ndarray]] = []
+    for index in range(count):
+        yaw = (2.0 * math.pi * index / max(count, 1)) + rng.normal(0.0, 0.06)
+        radius = float(np.clip(base_radius + rng.normal(0.0, 0.18), radius_min, radius_max))
+        z_offset = rng.uniform(-0.15 * room_height, 0.15 * room_height)
+        eye = room_center + np.asarray(
+            [radius * math.cos(yaw), radius * math.sin(yaw), z_offset],
+            dtype=np.float32,
+        )
+        rotation = look_at_opencv(eye, room_center, up)
+        poses.append((eye, rotation))
+    return poses, room_center.astype(np.float32), room_sizes.astype(np.float32)
+
+
+def candidate_score(info: dict[str, Any], *, selection_mode: str) -> float:
+    if selection_mode in {"room_wide_diverse_azimuth", "room_wide_balanced_azimuth_v2"}:
+        return float(info.get("scene_visible_ratio", 0.0))
+    return float(info.get("union_visible_ratio", 0.0))
+
+
+def assign_test_indices_stratified_azimuth(
+    frames: list[CameraFrame],
+    *,
+    test_views: int,
+    focus_center: np.ndarray,
+    azimuth_bin_count: int,
+) -> set[int]:
+    if test_views <= 0 or not frames:
+        return set()
+    if test_views >= len(frames):
+        return set(range(len(frames)))
+
+    bin_count = max(int(azimuth_bin_count), 1)
+    members_by_bin: dict[int, list[int]] = {index: [] for index in range(bin_count)}
+    for index, frame in enumerate(frames):
+        members_by_bin[azimuth_bin_index(frame.position, focus_center, bin_count=bin_count)].append(index)
+
+    raw_quotas: dict[int, float] = {}
+    quotas: dict[int, int] = {}
+    total_frames = max(len(frames), 1)
+    for bin_index, members in members_by_bin.items():
+        raw = (len(members) * test_views) / total_frames
+        raw_quotas[bin_index] = raw
+        quotas[bin_index] = min(int(math.floor(raw)), len(members))
+
+    remaining = test_views - sum(quotas.values())
+    remainders = sorted(
+        (
+            (raw_quotas[bin_index] - quotas[bin_index], bin_index)
+            for bin_index, members in members_by_bin.items()
+            if quotas[bin_index] < len(members)
+        ),
+        key=lambda item: (-item[0], item[1]),
+    )
+    while remaining > 0 and remainders:
+        progress = False
+        for _, bin_index in remainders:
+            if remaining <= 0:
+                break
+            if quotas[bin_index] >= len(members_by_bin[bin_index]):
+                continue
+            quotas[bin_index] += 1
+            remaining -= 1
+            progress = True
+        if not progress:
+            break
+
+    test_indices: set[int] = set()
+    for bin_index, members in members_by_bin.items():
+        quota = quotas[bin_index]
+        if quota <= 0:
+            continue
+        sample_positions = np.linspace(0, len(members) - 1, num=quota, dtype=int).tolist()
+        for local_index in sample_positions:
+            test_indices.add(members[local_index])
+
+    if len(test_indices) < test_views:
+        for index in range(len(frames)):
+            if len(test_indices) >= test_views:
+                break
+            test_indices.add(index)
+    elif len(test_indices) > test_views:
+        sorted_indices = sorted(test_indices)
+        test_indices = set(sorted_indices[:test_views])
+    return test_indices
+
+
 def select_multi_object_candidate_infos(
     candidate_infos: list[dict[str, Any]],
     *,
@@ -279,7 +430,7 @@ def select_multi_object_candidate_infos(
 ) -> list[dict[str, Any]]:
     ranked_candidates = sorted(
         candidate_infos,
-        key=lambda info: float(info["union_visible_ratio"]),
+        key=lambda info: candidate_score(info, selection_mode=selection_mode),
         reverse=True,
     )
     selected_infos: list[dict[str, Any]] = []
@@ -287,10 +438,15 @@ def select_multi_object_candidate_infos(
 
     # Ensure every selected target contributes at least one crop when possible.
     for target_id in target_ids:
+        target_ranked = sorted(
+            candidate_infos,
+            key=lambda info: float(info["visible_ratios"].get(target_id, 0.0)),
+            reverse=True,
+        )
         target_specific = next(
             (
                 info
-                for info in ranked_candidates
+                for info in target_ranked
                 if float(info["visible_ratios"].get(target_id, 0.0)) > 0.0
             ),
             None,
@@ -330,6 +486,69 @@ def select_multi_object_candidate_infos(
                     break
             if not progress:
                 break
+
+    if selection_mode == "room_wide_balanced_azimuth_v2":
+        bin_count = max(int(azimuth_bin_count), 1)
+        binned_candidates: dict[int, list[dict[str, Any]]] = {index: [] for index in range(bin_count)}
+        selected_counts = [0] * bin_count
+        for info in selected_infos:
+            selected_counts[
+                azimuth_bin_index(
+                    np.asarray(info["position"], dtype=np.float32),
+                    focus_center,
+                    bin_count=bin_count,
+                )
+            ] += 1
+
+        for info in ranked_candidates:
+            pose_key = camera_pose_key(np.asarray(info["position"], dtype=np.float32))
+            if pose_key in seen_pose_keys:
+                continue
+            bin_index = azimuth_bin_index(
+                np.asarray(info["position"], dtype=np.float32),
+                focus_center,
+                bin_count=bin_count,
+            )
+            binned_candidates[bin_index].append(info)
+
+        active_bins = [bin_index for bin_index, bucket in binned_candidates.items() if bucket]
+        for bin_index in active_bins:
+            if len(selected_infos) >= total_views:
+                break
+            if selected_counts[bin_index] > 0:
+                continue
+            candidate = binned_candidates[bin_index].pop(0)
+            pose_key = camera_pose_key(np.asarray(candidate["position"], dtype=np.float32))
+            if pose_key in seen_pose_keys:
+                continue
+            selected_infos.append(candidate)
+            seen_pose_keys.add(pose_key)
+            selected_counts[bin_index] += 1
+
+        soft_cap = max(1, math.ceil(total_views / max(len(active_bins), 1)))
+        while len(selected_infos) < total_views:
+            non_empty_bins = [bin_index for bin_index, bucket in binned_candidates.items() if bucket]
+            if not non_empty_bins:
+                break
+            eligible_bins = [bin_index for bin_index in non_empty_bins if selected_counts[bin_index] < soft_cap]
+            if not eligible_bins:
+                soft_cap += 1
+                continue
+            chosen_bin = min(
+                eligible_bins,
+                key=lambda bin_index: (
+                    selected_counts[bin_index],
+                    -candidate_score(binned_candidates[bin_index][0], selection_mode=selection_mode),
+                    bin_index,
+                ),
+            )
+            candidate = binned_candidates[chosen_bin].pop(0)
+            pose_key = camera_pose_key(np.asarray(candidate["position"], dtype=np.float32))
+            if pose_key in seen_pose_keys:
+                continue
+            selected_infos.append(candidate)
+            seen_pose_keys.add(pose_key)
+            selected_counts[chosen_bin] += 1
 
     for info in ranked_candidates:
         if len(selected_infos) >= total_views:
@@ -819,6 +1038,7 @@ def export_replica_multi_oracle_scene(
     radius_max: float,
     min_visible_ratio: float,
     selection_mode: str = "top_visibility",
+    camera_target_mode: str = "scene_focus",
     azimuth_bin_count: int = 8,
     candidate_pose_count: int | None = None,
     render_point_count: int = 1_000_000,
@@ -826,6 +1046,8 @@ def export_replica_multi_oracle_scene(
     scene_root = raw_root / scene_id
     targets = select_top_targets(scene_root, categories=list(categories), max_objects=max_objects)
     focus_center, _ = compute_scene_focus(targets)
+    room_center = focus_center
+    room_sizes = np.zeros(3, dtype=np.float32)
     output_scene_root = output_root / scene_id
     images_dir = output_scene_root / "images"
     oracle_dir = output_scene_root / "oracle"
@@ -853,13 +1075,23 @@ def export_replica_multi_oracle_scene(
     effective_min_visible_ratio = min_visible_ratio
     try:
         accepted: list[CameraFrame] = []
-        candidate_poses = generate_scene_orbit_camera_poses(
-            targets,
-            count=int(candidate_pose_count) if candidate_pose_count is not None else max(total_views * 48, 512),
-            seed=seed,
-            radius_min=radius_min,
-            radius_max=radius_max,
-        )
+        if camera_target_mode == "room_center":
+            candidate_poses, focus_center, room_sizes = generate_room_wide_camera_poses(
+                scene_root,
+                count=int(candidate_pose_count) if candidate_pose_count is not None else max(total_views * 48, 512),
+                seed=seed,
+                radius_min=radius_min,
+                radius_max=radius_max,
+            )
+            room_center = focus_center
+        else:
+            candidate_poses = generate_scene_orbit_camera_poses(
+                targets,
+                count=int(candidate_pose_count) if candidate_pose_count is not None else max(total_views * 48, 512),
+                seed=seed,
+                radius_min=radius_min,
+                radius_max=radius_max,
+            )
         candidate_infos: list[dict[str, Any]] = []
         for position, rotation in candidate_poses:
             _, semantic = renderer.render(position=position, rotation_cam2world=rotation)
@@ -868,25 +1100,33 @@ def export_replica_multi_oracle_scene(
                 for target_id in target_ids
             }
             union_visible_ratio = float(np.isin(semantic, target_ids).mean())
+            scene_visible_ratio = float((semantic >= 0).mean())
             candidate_infos.append(
                 {
                     "position": np.asarray(position, dtype=np.float32),
                     "rotation": np.asarray(rotation, dtype=np.float32),
                     "visible_ratios": visible_ratios,
                     "union_visible_ratio": union_visible_ratio,
+                    "scene_visible_ratio": scene_visible_ratio,
                 }
             )
 
-        strong_candidates = [
-            info for info in candidate_infos if float(info["union_visible_ratio"]) >= min_visible_ratio
-        ]
-        if len(strong_candidates) >= total_views:
-            ranked_candidates = strong_candidates
-        else:
+        if selection_mode in {"room_wide_diverse_azimuth", "room_wide_balanced_azimuth_v2"}:
             ranked_candidates = [
-                info for info in candidate_infos if float(info["union_visible_ratio"]) > 0.0
+                info for info in candidate_infos if float(info["scene_visible_ratio"]) > 0.0
             ]
             effective_min_visible_ratio = 0.0
+        else:
+            strong_candidates = [
+                info for info in candidate_infos if float(info["union_visible_ratio"]) >= min_visible_ratio
+            ]
+            if len(strong_candidates) >= total_views:
+                ranked_candidates = strong_candidates
+            else:
+                ranked_candidates = [
+                    info for info in candidate_infos if float(info["union_visible_ratio"]) > 0.0
+                ]
+                effective_min_visible_ratio = 0.0
 
         if len(ranked_candidates) < total_views:
             raise RuntimeError(
@@ -932,7 +1172,15 @@ def export_replica_multi_oracle_scene(
     finally:
         renderer.close()
 
-    test_indices = set(np.linspace(0, len(accepted) - 1, num=test_views, dtype=int).tolist())
+    if selection_mode == "room_wide_balanced_azimuth_v2":
+        test_indices = assign_test_indices_stratified_azimuth(
+            accepted,
+            test_views=test_views,
+            focus_center=focus_center,
+            azimuth_bin_count=azimuth_bin_count,
+        )
+    else:
+        test_indices = set(np.linspace(0, len(accepted) - 1, num=test_views, dtype=int).tolist())
     for index, frame in enumerate(accepted):
         frame.split = "test" if index in test_indices else "train"
 
@@ -953,6 +1201,8 @@ def export_replica_multi_oracle_scene(
         points_rgb=points_rgb,
     )
 
+    train_frames = [frame for frame in accepted if frame.split == "train"]
+    test_frames = [frame for frame in accepted if frame.split == "test"]
     scene_meta = {
         "dataset": "replica",
         "raw_scene_id": scene_id,
@@ -971,13 +1221,47 @@ def export_replica_multi_oracle_scene(
         "oracle_max_objects": len(targets),
         "oracle_effective_min_visible_ratio": effective_min_visible_ratio,
         "camera_selection_mode": selection_mode,
+        "camera_target_mode": camera_target_mode,
+        "camera_distribution_version": 2 if selection_mode == "room_wide_balanced_azimuth_v2" else 1,
+        "camera_visibility_basis": (
+            "scene_visible_ratio"
+            if selection_mode in {"room_wide_diverse_azimuth", "room_wide_balanced_azimuth_v2"}
+            else "target_union_visible_ratio"
+        ),
         "camera_azimuth_bin_count": int(azimuth_bin_count),
         "camera_azimuth_histogram": accepted_azimuth_histogram(
             accepted,
             focus_center,
             bin_count=azimuth_bin_count,
         ),
+        "camera_position_histogram_all": accepted_azimuth_histogram(
+            accepted,
+            focus_center,
+            bin_count=azimuth_bin_count,
+        ),
+        "camera_position_histogram_train": accepted_azimuth_histogram(
+            train_frames,
+            focus_center,
+            bin_count=azimuth_bin_count,
+        ),
+        "camera_position_histogram_test": accepted_azimuth_histogram(
+            test_frames,
+            focus_center,
+            bin_count=azimuth_bin_count,
+        ),
+        "camera_forward_histogram_train": accepted_forward_histogram(
+            train_frames,
+            bin_count=azimuth_bin_count,
+        ),
+        "camera_forward_histogram_test": accepted_forward_histogram(
+            test_frames,
+            bin_count=azimuth_bin_count,
+        ),
+        "camera_axis_counts_train": accepted_axis_counts(train_frames),
+        "camera_axis_counts_test": accepted_axis_counts(test_frames),
         "candidate_pose_count": len(candidate_poses),
+        "room_center": room_center.tolist(),
+        "room_sizes": room_sizes.tolist(),
     }
     (output_scene_root / "scene_meta.json").write_text(json.dumps(scene_meta, indent=2), encoding="utf-8")
 
