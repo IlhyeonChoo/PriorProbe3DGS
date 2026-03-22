@@ -1,23 +1,21 @@
-# Python
+# Python bytecode and native extensions
 __pycache__/
 *.py[cod]
 *.so
 
-# Packaging
+# Build and packaging artifacts
 build/
 dist/
 *.egg-info/
 
-# Virtual environments
+# Virtual environments and tooling caches
 .venv/
 venv/
-
-# Tooling
 .pytest_cache/
 .mypy_cache/
 .ipynb_checkpoints/
 
-# ML / research intermediates
+# ML and research binaries
 *.pt
 *.pth
 *.ckpt
@@ -27,7 +25,7 @@ venv/
 *.safetensors
 *.onnx
 
-# Archives / partial downloads
+# Archives and partial downloads
 *.tar
 *.tar.gz
 *.tgz
@@ -36,80 +34,31 @@ venv/
 *.part*
 *.corrupt
 
-# Data and artifacts
-data/*
-!data/README.md
-data/**/*
-!data/**/
-!data/**/.gitkeep
-!data/**/README.md
-!data/**/scene_meta.json
-outputs/*
-!outputs/.gitkeep
-!outputs/experiments/
-outputs/experiments/**/*
-!outputs/experiments/**/
-!outputs/experiments/**/backend_run.json
-!outputs/experiments/**/evaluation.json
-!outputs/experiments/**/run_summary.json
-!outputs/backend_runs/
-outputs/backend_runs/**/*
-!outputs/backend_runs/**/
-# Keep lightweight backend metadata and qualitative summaries only.
-!outputs/backend_runs/**/*.json
-!outputs/backend_runs/**/cfg_args
-outputs/gaussian_direct/backend_runs/**/inspection
-# !outputs/backend_runs/**/inspection/**/*.html
-# !outputs/backend_runs/**/inspection/**/*.png
-!outputs/backend_runs/**/prior_init/aligned_prior*.ply
-outputs/backend_runs/**/._*
-!outputs/prior_library/
-outputs/prior_library/**/*
-!outputs/prior_library/**/
-!outputs/prior_library/**/*.json
-!outputs/reports/
-outputs/reports/**/*
-!outputs/reports/**/
-!outputs/reports/**/*.json
-!outputs/reports/**/*.csv
-!outputs/reports/**/*.md
-logs/*
-!logs/.gitkeep
-!outputs/*/
-outputs/*/**/*
-!outputs/*/experiments/
-outputs/*/experiments/**/*
-!outputs/*/experiments/**/
-!outputs/*/experiments/**/backend_run.json
-!outputs/*/experiments/**/evaluation.json
-!outputs/*/experiments/**/run_summary.json
-!outputs/*/backend_runs/
-outputs/*/backend_runs/**/*
-!outputs/*/backend_runs/**/
-!outputs/*/backend_runs/**/*.json
-!outputs/*/backend_runs/**/cfg_args
-!outputs/*/backend_runs/**/inspection/**/*.html
-!outputs/*/backend_runs/**/inspection/**/*.png
-!outputs/*/backend_runs/**/prior_init/aligned_prior*.ply
-outputs/*/backend_runs/**/._*
-!outputs/*/prior_library/
-outputs/*/prior_library/**/*
-!outputs/*/prior_library/**/
-!outputs/*/prior_library/**/*.json
-!outputs/*/reports/
-outputs/*/reports/**/*
-!outputs/*/reports/**/
-!outputs/*/reports/**/*.json
-!outputs/*/reports/**/*.csv
-!outputs/*/reports/**/*.md
-!logs/*/
-logs/*/**/*
-!logs/*/.gitkeep
+# Data: keep documentation, placeholders, and lightweight metadata only
+/data/**
+!/data/
+!/data/**/
+!/data/**/README.md
+!/data/**/.gitkeep
+!/data/**/scene_meta.json
 
+# Outputs: keep summarized reports only, ignore run artifacts
+!/outputs/
+!/outputs/.gitkeep
+/outputs/**/backend_runs/
+/outputs/**/experiments/
+/outputs/**/prior_library/
+/outputs/**/legacy_misc/
+/outputs/**/inspection/
+/outputs/**/._*
 
+# Logs
+/logs/**
+!/logs/
+!/logs/.gitkeep
 
-# AI용 파일
-CLAUDE.md
-AGENTS.md
+# Local assistant and staging scratch files
+/CLAUDE.md
+/AGENTS.md
+/docs/git_staging_guide*.md
 *.txt
-
