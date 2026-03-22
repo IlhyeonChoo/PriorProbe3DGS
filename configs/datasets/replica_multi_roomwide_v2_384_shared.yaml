@@ -1,0 +1,23 @@
+dataset:
+  name: replica
+  phase: A
+  root: /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi_roomwide_v2_384
+  format: colmap
+  default_scene_id: room_0
+  source_path_template: "{root}/{scene_id}"
+  images: images
+  depths: ""
+  eval: true
+  white_background: false
+  scene_type: controlled_indoor_multi_object
+  object_count_range: [2, 4]
+  notes:
+    - Replica multi-object oracle exports are staged on SSD for actual training runs.
+    - Room-wide v2 keeps room-center look-at but balances camera azimuth coverage.
+    - Visibility filtering is relaxed so some selected frames may not show the target objects.
+    - Current room-wide v2 rung targets 320 train views + 64 test views per scene.
+  scenes:
+    room_0:
+      relative_path: room_0
+    office_0:
+      relative_path: office_0
