@@ -58,8 +58,9 @@ outputs/backend_runs/**/*
 # Keep lightweight backend metadata and qualitative summaries only.
 !outputs/backend_runs/**/*.json
 !outputs/backend_runs/**/cfg_args
-!outputs/backend_runs/**/inspection/**/*.html
-!outputs/backend_runs/**/inspection/**/*.png
+outputs/gaussian_direct/backend_runs/**/inspection
+# !outputs/backend_runs/**/inspection/**/*.html
+# !outputs/backend_runs/**/inspection/**/*.png
 !outputs/backend_runs/**/prior_init/aligned_prior*.ply
 outputs/backend_runs/**/._*
 !outputs/prior_library/
@@ -110,4 +111,5 @@ logs/*/**/*
 # AI용 파일
 CLAUDE.md
 AGENTS.md
+*.txt
 
