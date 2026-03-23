@@ -19,6 +19,7 @@ import yaml
 
 from priorprobe.datasets import load_dataset_spec, resolve_dataset_scene, validate_scene_layout
 from priorprobe.evaluation.metrics import summarize_backend_run, summarize_run
+from priorprobe.experiment_storage import experiment_storage_dir, storage_experiment_name
 from priorprobe.insertion.alignment_search import (
     TargetBox,
     aabb_from_obb,
@@ -103,7 +104,7 @@ def experiment_output_dir(
     *,
     outputs_root: Path | None = None,
 ) -> Path:
-    output_path = (outputs_root or default_outputs_root()) / "experiments" / experiment_name
+    output_path = experiment_storage_dir((outputs_root or default_outputs_root()), "experiments", experiment_name)
     if scene_id is not None:
         output_path = output_path / scene_id
     return output_path
@@ -683,7 +684,7 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
         backend_payload["white_background"] = dataset_scene.white_background
         if is_placeholder_path(backend_payload.get("model_path")) and args.backend_model_path is None:
             backend_payload["model_path"] = str(
-                outputs_root / "backend_runs" / experiment["name"] / dataset_scene.scene_id
+                experiment_storage_dir(outputs_root, "backend_runs", str(experiment["name"])) / dataset_scene.scene_id
             )
 
     backend_config = Vanilla3DGSBackendConfig.from_payload(
@@ -1024,6 +1025,7 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
     metadata_path = output_dir / "backend_run.json"
     metadata = {
         "experiment_name": experiment["name"],
+        "storage_experiment_name": storage_experiment_name(str(experiment["name"]), outputs_root=outputs_root),
         "backend": "vanilla_3dgs",
         "initialization": experiment["initialization"],
         "alignment_mode": alignment_mode,

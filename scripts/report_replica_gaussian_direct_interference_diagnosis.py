@@ -17,6 +17,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from priorprobe.evaluation.metrics import summarize_backend_run
+from priorprobe.experiment_storage import resolve_experiment_storage_dir
 
 
 EXPERIMENTS = {
@@ -127,7 +128,7 @@ def main() -> int:
 
     for family_id, spec in EXPERIMENTS.items():
         experiment_name = str(spec["experiment_name"])
-        experiment_dir = args.outputs_dir / "experiments" / experiment_name / args.scene_id
+        experiment_dir = resolve_experiment_storage_dir(args.outputs_dir, "experiments", experiment_name) / args.scene_id
         backend_run_path = experiment_dir / "backend_run.json"
         if not backend_run_path.exists():
             continue

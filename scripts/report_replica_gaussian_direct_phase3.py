@@ -26,45 +26,30 @@ EXPERIMENTS = {
         "label": "baseline",
         "experiment_name": "gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_roomwide_v2_384_15000",
     },
-    "prior_none": {
+    "prior_100k": {
         "group": "reference",
-        "label": "prior 100K none",
+        "label": "prior 100K current",
         "experiment_name": "gaussian_direct_same_scene_exact_clip_roomwide_v2_384_15000",
     },
-    "prior_25k": {
+    "prior_25k_current": {
         "group": "reference",
-        "label": "A prior_25k",
+        "label": "A 25K current",
         "experiment_name": "gaussian_direct_same_scene_exact_clip_roomwide_v2_384_prior_25k_15000",
     },
-    "replace_region": {
-        "group": "diagnostic",
-        "label": "B replace_region",
-        "experiment_name": "gaussian_direct_same_scene_exact_clip_roomwide_v2_384_replace_region_15000",
+    "prior_25k_lr01": {
+        "group": "phase3",
+        "label": "lr_0.1",
+        "experiment_name": "gaussian_direct_same_scene_exact_clip_roomwide_v2_384_prior_25k_lr01_15000",
     },
-    "sh_zero": {
-        "group": "diagnostic",
-        "label": "C sh_zero",
-        "experiment_name": "gaussian_direct_same_scene_exact_clip_roomwide_v2_384_sh_zero_15000",
+    "prior_25k_lr10": {
+        "group": "phase3",
+        "label": "lr_1.0",
+        "experiment_name": "gaussian_direct_same_scene_exact_clip_roomwide_v2_384_prior_25k_lr10_15000",
     },
-    "combo_ac": {
-        "group": "combination",
-        "label": "A+C",
-        "experiment_name": "gaussian_direct_same_scene_exact_clip_roomwide_v2_384_prior_25k_sh_zero_15000",
-    },
-    "combo_ac_weak": {
-        "group": "combination",
-        "label": "A+C weak(0.02)",
-        "experiment_name": "gaussian_direct_same_scene_exact_clip_roomwide_v2_384_prior_25k_sh_zero_weak_15000",
-    },
-    "combo_ab": {
-        "group": "combination",
-        "label": "A+B",
-        "experiment_name": "gaussian_direct_same_scene_exact_clip_roomwide_v2_384_prior_25k_replace_region_15000",
-    },
-    "combo_abc": {
-        "group": "combination",
-        "label": "A+B+C",
-        "experiment_name": "gaussian_direct_same_scene_exact_clip_roomwide_v2_384_prior_25k_replace_region_sh_zero_15000",
+    "prior_25k_full_none": {
+        "group": "phase3",
+        "label": "full_none",
+        "experiment_name": "gaussian_direct_same_scene_exact_clip_roomwide_v2_384_prior_25k_full_none_15000",
     },
 }
 
@@ -101,14 +86,6 @@ def load_prior_protection(model_path: Path, iteration: int) -> dict[str, Any] | 
     return load_json(path)
 
 
-def mode_label(backend_run: dict[str, Any]) -> str:
-    protection = dict(backend_run.get("prior_protection") or {})
-    mode = str(protection.get("mode") or "none")
-    if mode == "weak":
-        return f"weak({float(protection.get('lr_scale', 0.0)):.2f})"
-    return mode
-
-
 def write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
@@ -116,6 +93,18 @@ def write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, Any]]) -> 
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
+
+
+def fmt_float(value: Any, *, digits: int = 6) -> str:
+    if value is None:
+        return "n/a"
+    return f"{float(value):.{digits}f}"
+
+
+def fmt_int(value: Any) -> str:
+    if value is None:
+        return "n/a"
+    return str(int(value))
 
 
 def fmt_delta(candidate: dict[str, Any] | None, reference: dict[str, Any] | None, key: str) -> str:
@@ -128,8 +117,19 @@ def fmt_delta(candidate: dict[str, Any] | None, reference: dict[str, Any] | None
     return f"{float(lhs) - float(rhs):+.6f}"
 
 
+def final_psnr_relation(candidate: float | None, reference: float | None) -> str:
+    if candidate is None or reference is None:
+        return "insufficient data"
+    delta = float(candidate) - float(reference)
+    if delta > 0.01:
+        return "higher"
+    if delta < -0.01:
+        return "lower"
+    return "similar"
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Report Gaussian-direct interference combination runs.")
+    parser = argparse.ArgumentParser(description="Report Gaussian-direct Phase 3 runs.")
     parser.add_argument("--outputs-dir", type=Path, default=ROOT / "outputs" / "gaussian_direct")
     parser.add_argument("--scene-id", type=str, default="room_0")
     args = parser.parse_args()
@@ -143,11 +143,11 @@ def main() -> int:
         backend_run_path = experiment_dir / "backend_run.json"
         if not backend_run_path.exists():
             continue
+
         backend_run = load_json(backend_run_path)
         summary = summarize_backend_run(backend_run_path)
         evaluation = summary.to_dict()
-        evaluation_path = experiment_dir / "evaluation.json"
-        evaluation_path.write_text(json.dumps(evaluation, indent=2), encoding="utf-8")
+        (experiment_dir / "evaluation.json").write_text(json.dumps(evaluation, indent=2), encoding="utf-8")
 
         checkpoints = list(evaluation.get("checkpoint_metrics") or [])
         if family_id == "baseline":
@@ -160,9 +160,18 @@ def main() -> int:
         selected_priors = list(prior_init_metadata.get("selected_priors") or backend_run.get("selected_priors") or [])
         protection_3000 = load_prior_protection(model_path, 3000)
         protection_15000 = load_prior_protection(model_path, 15000)
-        insertion = dict(backend_run.get("prior_insertion") or {})
+        protection_iter0 = load_prior_protection(model_path, 0)
+
         prior_original_total = sum(int(item.get("original_point_count", 0) or 0) for item in selected_priors)
         prior_kept_total = sum(int(item.get("kept_point_count", 0) or 0) for item in selected_priors)
+        prior_3000 = protection_3000.get("protected_point_count") if protection_3000 else None
+        prior_15000 = protection_15000.get("protected_point_count") if protection_15000 else None
+        prior_0 = protection_iter0.get("protected_point_count") if protection_iter0 else None
+        prior_survival_3000 = (float(prior_3000) / float(prior_kept_total)) if prior_3000 is not None and prior_kept_total else None
+        prior_survival_15000 = (float(prior_15000) / float(prior_kept_total)) if prior_15000 is not None and prior_kept_total else None
+        prior_densified_3000 = (int(prior_3000) - int(prior_kept_total)) if prior_3000 is not None and prior_kept_total else None
+        prior_densified_15000 = (int(prior_15000) - int(prior_kept_total)) if prior_15000 is not None and prior_kept_total else None
+        protection = dict(backend_run.get("prior_protection") or {})
 
         row = {
             "family_id": family_id,
@@ -170,20 +179,18 @@ def main() -> int:
             "label": spec["label"],
             "experiment_name": experiment_name,
             "scene_id": args.scene_id,
-            "protection_mode": mode_label(backend_run),
-            "prior_sh_reset_mode": insertion.get("sh_reset_mode", prior_init_metadata.get("prior_sh_reset_mode")),
-            "prior_target_total_gaussians": insertion.get(
-                "target_total_gaussians",
-                prior_init_metadata.get("prior_target_total_gaussians"),
-            ),
-            "sfm_region_replacement_mode": insertion.get(
-                "sfm_region_replacement_mode",
-                prior_init_metadata.get("sfm_region_replacement_mode"),
-            ),
-            "sfm_removed_point_count": insertion.get("sfm_removed_point_count", prior_init_metadata.get("sfm_removed_point_count")),
-            "sfm_removed_point_ratio": insertion.get("sfm_removed_point_ratio", prior_init_metadata.get("sfm_removed_point_ratio")),
+            "prior_lr_scale": protection.get("lr_scale"),
+            "protect_from_prune": protection.get("protect_from_prune"),
+            "protect_from_densify": protection.get("protect_from_densify"),
             "prior_original_total": prior_original_total,
             "prior_kept_total": prior_kept_total,
+            "prior_0": prior_0,
+            "prior_3000": prior_3000,
+            "prior_15000": prior_15000,
+            "prior_survival_3000": prior_survival_3000,
+            "prior_survival_15000": prior_survival_15000,
+            "prior_densified_3000": prior_densified_3000,
+            "prior_densified_15000": prior_densified_15000,
             "total_time_sec": evaluation.get("total_optimization_time_sec"),
             "target_psnr": None,
             "time_to_target_sec": None,
@@ -199,8 +206,6 @@ def main() -> int:
             "iter_15000_ssim": (checkpoint_by_iteration(checkpoints, 15000) or {}).get("ssim"),
             "iter_15000_lpips": (checkpoint_by_iteration(checkpoints, 15000) or {}).get("lpips"),
             "iter_15000_gaussians": (checkpoint_by_iteration(checkpoints, 15000) or {}).get("gaussian_count"),
-            "protected_3000": protection_3000.get("protected_point_count") if protection_3000 else None,
-            "protected_15000": protection_15000.get("protected_point_count") if protection_15000 else None,
             "checkpoints": checkpoints,
         }
         rows.append(row)
@@ -219,10 +224,9 @@ def main() -> int:
                     "label": row["label"],
                     "group": row["group"],
                     "scene_id": row["scene_id"],
-                    "protection_mode": row["protection_mode"],
-                    "prior_sh_reset_mode": row["prior_sh_reset_mode"],
-                    "prior_target_total_gaussians": row["prior_target_total_gaussians"],
-                    "sfm_region_replacement_mode": row["sfm_region_replacement_mode"],
+                    "prior_lr_scale": row["prior_lr_scale"],
+                    "protect_from_prune": row["protect_from_prune"],
+                    "protect_from_densify": row["protect_from_densify"],
                     "iteration": checkpoint.get("iteration"),
                     "method": checkpoint.get("method"),
                     "psnr": checkpoint.get("psnr"),
@@ -234,8 +238,8 @@ def main() -> int:
             )
 
     reports_dir = args.outputs_dir / "reports"
-    summary_csv = reports_dir / f"replica_gaussian_direct_interference_combinations_{args.scene_id}_summary.csv"
-    checkpoints_csv = reports_dir / f"replica_gaussian_direct_interference_combinations_{args.scene_id}_checkpoints.csv"
+    summary_csv = reports_dir / f"replica_gaussian_direct_phase3_{args.scene_id}_summary.csv"
+    checkpoints_csv = reports_dir / f"replica_gaussian_direct_phase3_{args.scene_id}_checkpoints.csv"
     write_csv(
         summary_csv,
         [
@@ -244,14 +248,18 @@ def main() -> int:
             "label",
             "experiment_name",
             "scene_id",
-            "protection_mode",
-            "prior_sh_reset_mode",
-            "prior_target_total_gaussians",
-            "sfm_region_replacement_mode",
-            "sfm_removed_point_count",
-            "sfm_removed_point_ratio",
+            "prior_lr_scale",
+            "protect_from_prune",
+            "protect_from_densify",
             "prior_original_total",
             "prior_kept_total",
+            "prior_0",
+            "prior_3000",
+            "prior_15000",
+            "prior_survival_3000",
+            "prior_survival_15000",
+            "prior_densified_3000",
+            "prior_densified_15000",
             "target_psnr",
             "time_to_target_sec",
             "total_time_sec",
@@ -267,8 +275,6 @@ def main() -> int:
             "iter_15000_ssim",
             "iter_15000_lpips",
             "iter_15000_gaussians",
-            "protected_3000",
-            "protected_15000",
         ],
         summary_rows,
     )
@@ -279,10 +285,9 @@ def main() -> int:
             "label",
             "group",
             "scene_id",
-            "protection_mode",
-            "prior_sh_reset_mode",
-            "prior_target_total_gaussians",
-            "sfm_region_replacement_mode",
+            "prior_lr_scale",
+            "protect_from_prune",
+            "protect_from_densify",
             "iteration",
             "method",
             "psnr",
@@ -294,113 +299,76 @@ def main() -> int:
         checkpoint_rows,
     )
 
-    by_id = {row["family_id"]: row for row in summary_rows}
-    combo_rows = [row for row in summary_rows if row["group"] == "combination"]
-    reference = by_id.get("prior_25k")
-    baseline = by_id.get("baseline")
+    row_map = {row["family_id"]: row for row in summary_rows}
+    reference = row_map.get("prior_25k_current")
+    baseline = row_map.get("baseline")
+    lr01 = row_map.get("prior_25k_lr01")
+    lr10 = row_map.get("prior_25k_lr10")
+    full_none = row_map.get("prior_25k_full_none")
 
-    lines = [
-        "# Replica Gaussian-Direct Interference Combinations",
+    md_lines = [
+        "# Replica Gaussian-Direct Phase 3",
         "",
-        f"- Date: {datetime.now(UTC).date().isoformat()}",
+        f"- Date: {datetime.now(UTC).strftime('%Y-%m-%d')}",
         f"- Scene: `{args.scene_id}`",
         "- Dataset family: `roomwide_v2_384`",
-        "- 비교 기준: baseline / prior 100K none / A prior_25k / 진단 실험 핵심(B, C)",
-        "- 주 지표: `iter_0`, `iter_3000`, `iter_15000` PSNR/SSIM/LPIPS와 gaussian count",
+        "- 비교 기준: baseline / prior 100K current / A 25K current / Phase 3 세 조건",
+        "- 주 지표: `iter_0`, `iter_3000`, `iter_15000` PSNR/SSIM/LPIPS, prior 생존량, total gaussian count",
         "- 참고: `time_to_target_sec`는 표에는 남기되 판단의 주 근거로 쓰지 않음",
         "",
         "## Summary",
         "",
-        "| label | group | protection | sh_reset | prior_budget | sfm_replace | sfm_removed | iter_0_psnr | iter_3000_psnr | iter_15000_psnr | gaussians@0 | gaussians@3000 | gaussians@15000 |",
-        "|---|---|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| label | group | lr_scale | prune_protect | densify_protect | iter_0_psnr | iter_3000_psnr | iter_15000_psnr | gaussians@0 | gaussians@3000 | gaussians@15000 | prior@0 | prior@3000 | prior@15000 |",
+        "|---|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in summary_rows:
-        lines.append(
-            "| {label} | {group} | {protection_mode} | {prior_sh_reset_mode} | {prior_target_total_gaussians} | {sfm_region_replacement_mode} | {sfm_removed_point_count} | {iter_0_psnr} | {iter_3000_psnr} | {iter_15000_psnr} | {iter_0_gaussians} | {iter_3000_gaussians} | {iter_15000_gaussians} |".format(
-                **{
-                    **row,
-                    "sfm_removed_point_count": row["sfm_removed_point_count"] if row["sfm_removed_point_count"] is not None else "n/a",
-                }
-            )
+        md_lines.append(
+            f"| {row['label']} | {row['group']} | {fmt_float(row['prior_lr_scale'], digits=2)} | "
+            f"{row['protect_from_prune']} | {row['protect_from_densify']} | "
+            f"{fmt_float(row['iter_0_psnr'])} | {fmt_float(row['iter_3000_psnr'])} | {fmt_float(row['iter_15000_psnr'])} | "
+            f"{fmt_int(row['iter_0_gaussians'])} | {fmt_int(row['iter_3000_gaussians'])} | {fmt_int(row['iter_15000_gaussians'])} | "
+            f"{fmt_int(row['prior_0'])} | {fmt_int(row['prior_3000'])} | {fmt_int(row['prior_15000'])} |"
         )
 
-    lines.extend(
+    md_lines.extend(
         [
             "",
-            "## Combination Focus",
+            "## Phase 3 Focus",
             "",
-            "| label | iter_0 vs A25K | iter_3000 vs A25K | final vs A25K | iter_0 vs baseline | final vs baseline | prior_kept_total | sfm_removed_ratio |",
-            "|---|---:|---:|---:|---:|---:|---:|---:|",
+            "| label | final vs A25K | iter_3000 vs A25K | final vs baseline | prior_survival@3000 | prior_survival@15000 | prior_densified@3000 | prior_densified@15000 | total_time_sec | time_to_target_sec |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
-    for row in combo_rows:
-        lines.append(
-            "| {label} | {d_i0_a25k} | {d_i3_a25k} | {d_f_a25k} | {d_i0_base} | {d_f_base} | {prior_kept_total} | {sfm_removed_ratio} |".format(
-                label=row["label"],
-                d_i0_a25k=fmt_delta(row, reference, "iter_0_psnr"),
-                d_i3_a25k=fmt_delta(row, reference, "iter_3000_psnr"),
-                d_f_a25k=fmt_delta(row, reference, "iter_15000_psnr"),
-                d_i0_base=fmt_delta(row, baseline, "iter_0_psnr"),
-                d_f_base=fmt_delta(row, baseline, "iter_15000_psnr"),
-                prior_kept_total=row["prior_kept_total"],
-                sfm_removed_ratio=(
-                    f"{float(row['sfm_removed_point_ratio']):.6f}"
-                    if row["sfm_removed_point_ratio"] is not None
-                    else "n/a"
-                ),
-            )
+    for key in ("prior_25k_lr01", "prior_25k_lr10", "prior_25k_full_none"):
+        row = row_map.get(key)
+        if row is None:
+            continue
+        md_lines.append(
+            f"| {row['label']} | {fmt_delta(row, reference, 'iter_15000_psnr')} | {fmt_delta(row, reference, 'iter_3000_psnr')} | "
+            f"{fmt_delta(row, baseline, 'iter_15000_psnr')} | {fmt_float(row['prior_survival_3000'])} | {fmt_float(row['prior_survival_15000'])} | "
+            f"{fmt_int(row['prior_densified_3000'])} | {fmt_int(row['prior_densified_15000'])} | "
+            f"{fmt_float(row['total_time_sec'])} | {fmt_float(row['time_to_target_sec'])} |"
         )
 
-    lines.extend(
+    md_lines.extend(
         [
             "",
-            "## Insertion Diagnostics",
+            "## Interpretation Hints",
             "",
-            "| label | prior_original_total | prior_kept_total | protected@3000 | protected@15000 | sfm_removed_ratio | total_time_sec | time_to_target_sec |",
-            "|---|---:|---:|---:|---:|---:|---:|---:|",
+            f"- 현재 기준 비교점 `A 25K current`: iter_0 `{fmt_float(reference.get('iter_0_psnr') if reference else None)}`, iter_3000 `{fmt_float(reference.get('iter_3000_psnr') if reference else None)}`, final `{fmt_float(reference.get('iter_15000_psnr') if reference else None)}`",
+            f"- `lr_1.0` final vs A25K: `{fmt_delta(lr10, reference, 'iter_15000_psnr')}` -> `{final_psnr_relation(lr10.get('iter_15000_psnr') if lr10 else None, reference.get('iter_15000_psnr') if reference else None)}`",
+            f"- `lr_0.1` final vs A25K: `{fmt_delta(lr01, reference, 'iter_15000_psnr')}` -> `{final_psnr_relation(lr01.get('iter_15000_psnr') if lr01 else None, reference.get('iter_15000_psnr') if reference else None)}`",
+            f"- `full_none` final vs A25K: `{fmt_delta(full_none, reference, 'iter_15000_psnr')}` -> `{final_psnr_relation(full_none.get('iter_15000_psnr') if full_none else None, reference.get('iter_15000_psnr') if reference else None)}`",
+            f"- `full_none` prior@15000: `{fmt_int(full_none.get('prior_15000') if full_none else None)}` / kept `{fmt_int(full_none.get('prior_kept_total') if full_none else None)}`",
+            f"- `full_none` densified@15000: `{fmt_int(full_none.get('prior_densified_15000') if full_none else None)}`",
         ]
     )
-    for row in summary_rows:
-        lines.append(
-            "| {label} | {prior_original_total} | {prior_kept_total} | {protected_3000} | {protected_15000} | {sfm_removed_ratio} | {total_time_sec} | {time_to_target_sec} |".format(
-                **{
-                    **row,
-                    "protected_3000": row["protected_3000"] if row["protected_3000"] is not None else "n/a",
-                    "protected_15000": row["protected_15000"] if row["protected_15000"] is not None else "n/a",
-                    "sfm_removed_ratio": (
-                        f"{float(row['sfm_removed_point_ratio']):.6f}"
-                        if row["sfm_removed_point_ratio"] is not None
-                        else "n/a"
-                    ),
-                    "time_to_target_sec": (
-                        f"{float(row['time_to_target_sec']):.6f}"
-                        if row["time_to_target_sec"] is not None
-                        else "n/a"
-                    ),
-                }
-            )
-        )
 
-    if reference is not None:
-        lines.extend(
-            [
-                "",
-                "## Interpretation Hints",
-                "",
-                f"- 현재 기준 비교점 `A prior_25k`: iter_0 `{reference['iter_0_psnr']}`, iter_3000 `{reference['iter_3000_psnr']}`, final `{reference['iter_15000_psnr']}`",
-                f"- `A+B` final delta vs A25K: `{fmt_delta(by_id.get('combo_ab'), reference, 'iter_15000_psnr')}` dB",
-                f"- `A+C` final delta vs A25K: `{fmt_delta(by_id.get('combo_ac'), reference, 'iter_15000_psnr')}` dB",
-                f"- `A+B+C` final delta vs A25K: `{fmt_delta(by_id.get('combo_abc'), reference, 'iter_15000_psnr')}` dB",
-                f"- `A+C weak` vs `A+C` at iter_3000: `{fmt_delta(by_id.get('combo_ac_weak'), by_id.get('combo_ac'), 'iter_3000_psnr')}` dB",
-                f"- `A+C weak` vs `A+C` final: `{fmt_delta(by_id.get('combo_ac_weak'), by_id.get('combo_ac'), 'iter_15000_psnr')}` dB",
-            ]
-        )
-
-    report_path = ROOT / "docs" / "experiments" / f"replica_gaussian_direct_interference_combinations_{args.scene_id}_{datetime.now(UTC).date().isoformat()}.md"
-    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"Saved report to {report_path}")
-    print(f"Saved summary CSV to {summary_csv}")
-    print(f"Saved checkpoint CSV to {checkpoints_csv}")
+    output_path = ROOT / "docs" / "experiments" / f"replica_gaussian_direct_phase3_{args.scene_id}_{datetime.now(UTC).strftime('%Y-%m-%d')}.md"
+    output_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    print(f"Wrote {output_path}")
+    print(f"Summary CSV: {summary_csv}")
+    print(f"Checkpoints CSV: {checkpoints_csv}")
     return 0
 
 

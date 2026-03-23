@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,11 @@ from plyfile import PlyData
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from priorprobe.experiment_storage import resolve_experiment_storage_dir
 
 
 DEFAULT_EXPERIMENTS = [
@@ -55,8 +61,9 @@ def collect_rows(outputs_dir: Path, experiments: list[str], scene_ids: list[str]
     rows: list[dict[str, Any]] = []
     for experiment_name in experiments:
         for scene_id in scene_ids:
-            evaluation_path = outputs_dir / "experiments" / experiment_name / scene_id / "evaluation.json"
-            backend_run_path = outputs_dir / "experiments" / experiment_name / scene_id / "backend_run.json"
+            experiment_dir = resolve_experiment_storage_dir(outputs_dir, "experiments", experiment_name) / scene_id
+            evaluation_path = experiment_dir / "evaluation.json"
+            backend_run_path = experiment_dir / "backend_run.json"
             if not evaluation_path.exists() or not backend_run_path.exists():
                 continue
             evaluation = load_json(evaluation_path)

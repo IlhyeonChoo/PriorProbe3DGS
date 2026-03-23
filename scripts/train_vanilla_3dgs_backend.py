@@ -755,6 +755,25 @@ def apply_gaussian_insertion_policy(
     return processed, updated
 
 
+def resolve_selected_prior_metadata_items(
+    prepared_init_plys: list[str],
+    prepared_init_formats: list[str],
+    selected_priors_metadata: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    resolved: list[dict[str, Any]] = []
+    for index, (init_path_value, init_format) in enumerate(zip(prepared_init_plys, prepared_init_formats)):
+        if index < len(selected_priors_metadata):
+            resolved.append(dict(selected_priors_metadata[index]))
+            continue
+        resolved.append(
+            {
+                "aligned_prior": str(init_path_value),
+                "asset_format": init_format,
+            }
+        )
+    return resolved
+
+
 def initialize_loaded_prior(gaussians, train_cam_infos, cameras_extent: float) -> None:
     gaussians.spatial_lr_scale = cameras_extent
     gaussians.max_radii2D = torch.zeros((gaussians.get_xyz.shape[0]), device="cuda")
@@ -1198,16 +1217,15 @@ def make_prior_init_scene():
                     gaussian_original_counts: list[int] = []
                     gaussian_raw_entries: list[tuple[np.ndarray, dict[str, Any]]] = []
                     updated_selected_priors: list[dict[str, Any]] = []
-                    for init_path_value, init_format in zip(prepared_init_plys, prepared_init_formats):
-                        index = len(updated_selected_priors)
-                        metadata_item = (
-                            dict(selected_priors_metadata[index])
-                            if index < len(selected_priors_metadata)
-                            else {
-                                "aligned_prior": str(init_path_value),
-                                "asset_format": init_format,
-                            }
-                        )
+                    resolved_metadata_items = resolve_selected_prior_metadata_items(
+                        prepared_init_plys,
+                        prepared_init_formats,
+                        selected_priors_metadata,
+                    )
+                    for (init_path_value, init_format), metadata_item in zip(
+                        zip(prepared_init_plys, prepared_init_formats),
+                        resolved_metadata_items,
+                    ):
                         if init_format == "gaussian":
                             gaussian_vertex = np.array(
                                 PlyData.read(Path(init_path_value))["vertex"].data,

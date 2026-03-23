@@ -4,12 +4,18 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from priorprobe.experiment_storage import resolve_experiment_storage_dir
 
 FAMILIES = {
     "roomwide_96": {
@@ -105,7 +111,7 @@ def collect_rows(outputs_dir: Path, scene_ids: list[str], baseline_iteration: in
     for family_id, family in FAMILIES.items():
         for experiment_name in family["experiments"]:
             for scene_id in scene_ids:
-                experiment_dir = outputs_dir / "experiments" / experiment_name / scene_id
+                experiment_dir = resolve_experiment_storage_dir(outputs_dir, "experiments", experiment_name) / scene_id
                 evaluation_path = experiment_dir / "evaluation.json"
                 backend_run_path = experiment_dir / "backend_run.json"
                 if not evaluation_path.exists() or not backend_run_path.exists():
