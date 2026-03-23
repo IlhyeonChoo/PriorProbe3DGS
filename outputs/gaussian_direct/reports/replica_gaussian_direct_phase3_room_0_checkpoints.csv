@@ -1,0 +1,1 @@
+experiment_name,label,group,scene_id,prior_lr_scale,protect_from_prune,protect_from_densify,iteration,method,psnr,ssim,lpips,gaussian_count,estimated_elapsed_sec
