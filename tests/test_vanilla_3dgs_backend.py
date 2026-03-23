@@ -255,3 +255,46 @@ def test_propagate_prior_runtime_args_copies_diagnostic_controls(tmp_path: Path)
     assert dataset.sfm_region_margin_min_m == 0.05
     assert dataset.protect_prior_from_prune is True
     assert dataset.protect_prior_from_densify is False
+
+
+def test_resolve_selected_prior_metadata_items_preserves_gaussian_entry_order(tmp_path: Path) -> None:
+    backend_module = _load_backend_module(tmp_path / "fake_repo")
+
+    prepared_init_plys = ["/tmp/aligned_prior_00.ply", "/tmp/aligned_prior_01.ply", "/tmp/aligned_prior_02.ply"]
+    prepared_init_formats = ["gaussian", "gaussian", "gaussian"]
+    selected_priors_metadata = [
+        {"prior_object_id": "replica_room_0_obj_6", "target_object_id": 6},
+        {"prior_object_id": "replica_room_0_obj_9", "target_object_id": 9},
+        {"prior_object_id": "replica_room_0_obj_74", "target_object_id": 74},
+    ]
+
+    resolved = backend_module.resolve_selected_prior_metadata_items(
+        prepared_init_plys,
+        prepared_init_formats,
+        selected_priors_metadata,
+    )
+
+    assert [item["prior_object_id"] for item in resolved] == [
+        "replica_room_0_obj_6",
+        "replica_room_0_obj_9",
+        "replica_room_0_obj_74",
+    ]
+    assert [item["target_object_id"] for item in resolved] == [6, 9, 74]
+
+
+def test_resolve_selected_prior_metadata_items_falls_back_for_missing_entries(tmp_path: Path) -> None:
+    backend_module = _load_backend_module(tmp_path / "fake_repo")
+
+    prepared_init_plys = ["/tmp/aligned_prior_00.ply", "/tmp/aligned_prior_01.ply"]
+    prepared_init_formats = ["gaussian", "pointcloud"]
+    selected_priors_metadata = [{"prior_object_id": "replica_room_0_obj_6", "target_object_id": 6}]
+
+    resolved = backend_module.resolve_selected_prior_metadata_items(
+        prepared_init_plys,
+        prepared_init_formats,
+        selected_priors_metadata,
+    )
+
+    assert resolved[0]["prior_object_id"] == "replica_room_0_obj_6"
+    assert resolved[1]["aligned_prior"] == "/tmp/aligned_prior_01.ply"
+    assert resolved[1]["asset_format"] == "pointcloud"
