@@ -18,6 +18,12 @@ if str(SRC) not in sys.path:
 
 from priorprobe.evaluation.metrics import summarize_backend_run
 from priorprobe.experiment_storage import resolve_experiment_storage_dir
+from priorprobe.runtime_paths import (
+    build_dated_doc_path,
+    build_dated_report_csv_path,
+    find_latest_dated_report_csv,
+    legacy_report_csv_path,
+)
 
 
 EXPERIMENTS = {
@@ -53,13 +59,7 @@ EXPERIMENTS = {
     },
 }
 
-ROOM0_REFERENCE_SUMMARY = (
-    ROOT
-    / "outputs"
-    / "gaussian_direct"
-    / "reports"
-    / "replica_gaussian_direct_interference_combinations_room_0_summary.csv"
-)
+ROOM0_REFERENCE_SLUG = "interference_combinations_room_0"
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -143,11 +143,24 @@ def fmt_delta(lhs: float | None, rhs: float | None) -> str:
     return f"{lhs - rhs:+.6f}"
 
 
-def load_room0_reference() -> dict[str, dict[str, Any]]:
-    if not ROOM0_REFERENCE_SUMMARY.exists():
+def resolve_room0_reference_summary(outputs_dir: Path) -> Path | None:
+    dated = find_latest_dated_report_csv(outputs_dir, slug=ROOM0_REFERENCE_SLUG, kind="summary")
+    if dated is not None:
+        return dated
+    legacy = legacy_report_csv_path(outputs_dir, slug=ROOM0_REFERENCE_SLUG, kind="summary")
+    if legacy.exists():
+        return legacy
+    return None
+
+
+def load_room0_reference(outputs_dir: Path) -> dict[str, dict[str, Any]]:
+    candidate = resolve_room0_reference_summary(outputs_dir)
+    if candidate is None:
         return {}
-    with ROOM0_REFERENCE_SUMMARY.open("r", encoding="utf-8", newline="") as handle:
+    with candidate.open("r", encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
+    if not rows:
+        return {}
     by_label: dict[str, dict[str, Any]] = {}
     for row in rows:
         label = str(row.get("label") or "")
@@ -160,19 +173,22 @@ def main() -> int:
     parser.add_argument("--outputs-dir", type=Path, default=ROOT / "outputs" / "gaussian_direct")
     parser.add_argument("--scene-id", type=str, default="office_0")
     args = parser.parse_args()
+    outputs_dir = args.outputs_dir
+    report_date = datetime.now(UTC).date()
+    report_slug = "office0_cross_validation" if args.scene_id == "office_0" else f"office0_cross_validation_{args.scene_id}"
 
     rows: list[dict[str, Any]] = []
     baseline_target_psnr: float | None = None
 
     for family_id, spec in EXPERIMENTS.items():
         experiment_name = str(spec["experiment_name"])
-        experiment_dir = resolve_experiment_storage_dir(args.outputs_dir, "experiments", experiment_name) / args.scene_id
+        experiment_dir = resolve_experiment_storage_dir(outputs_dir, "experiments", experiment_name) / args.scene_id
         backend_run_path = experiment_dir / "backend_run.json"
         if not backend_run_path.exists():
             continue
         backend_run = load_backend_run_payload(
             backend_run_path,
-            outputs_dir=args.outputs_dir,
+            outputs_dir=outputs_dir,
             experiment_name=experiment_name,
             scene_id=args.scene_id,
         )
@@ -266,9 +282,13 @@ def main() -> int:
                 }
             )
 
-    reports_dir = args.outputs_dir / "reports"
-    summary_csv = reports_dir / f"replica_gaussian_direct_office0_cross_validation_{args.scene_id}_summary.csv"
-    checkpoints_csv = reports_dir / f"replica_gaussian_direct_office0_cross_validation_{args.scene_id}_checkpoints.csv"
+    summary_csv = build_dated_report_csv_path(outputs_dir, slug=report_slug, kind="summary", when=report_date)
+    checkpoints_csv = build_dated_report_csv_path(
+        outputs_dir,
+        slug=report_slug,
+        kind="checkpoints",
+        when=report_date,
+    )
     write_csv(
         summary_csv,
         [
@@ -323,7 +343,7 @@ def main() -> int:
         checkpoint_rows,
     )
 
-    room0_reference = load_room0_reference()
+    room0_reference = load_room0_reference(outputs_dir)
     by_id = {row["family_id"]: row for row in summary_rows}
     baseline = by_id.get("baseline")
     a25k = by_id.get("prior_25k")
@@ -331,7 +351,7 @@ def main() -> int:
     lines = [
         "# Office_0 교차 검증: 간섭 완화 조합 실험",
         "",
-        f"- Date: {datetime.now(UTC).date().isoformat()}",
+        f"- Date: {report_date.isoformat()}",
         f"- Scene: `{args.scene_id}`",
         "- Dataset family: `roomwide_v2_384`",
         "- 기준선: 기존 `baseline` 재사용",
@@ -432,7 +452,8 @@ def main() -> int:
         ]
     )
 
-    report_path = ROOT / "docs" / "experiments" / f"replica_gaussian_direct_office0_cross_validation_{datetime.now(UTC).date().isoformat()}.md"
+    report_path = build_dated_doc_path(ROOT, doc_dir="experiment_results", slug=report_slug, when=report_date)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"Saved report to {report_path}")
     print(f"Saved summary CSV to {summary_csv}")

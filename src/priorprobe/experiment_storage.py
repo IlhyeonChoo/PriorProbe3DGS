@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
 GAUSSIAN_DIRECT_PREFIX = "gaussian_direct_"
+DATED_EXPERIMENT_RE = re.compile(r"^\d{2}-\d{2}-.+-\d{4}$")
 
 
 def storage_experiment_name(experiment_name: str, *, outputs_root: Path | None = None) -> str:
     name = str(experiment_name).strip()
     if not name:
+        return name
+    if DATED_EXPERIMENT_RE.fullmatch(name):
         return name
     root_name = Path(outputs_root).name if outputs_root is not None else None
     if root_name is None or root_name == "gaussian_direct":

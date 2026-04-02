@@ -5,6 +5,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import torch
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
@@ -90,6 +92,9 @@ def test_build_train_command_without_prior(tmp_path: Path) -> None:
     assert "--prior-ply" not in command
     assert "--disable_viewer" in command
     assert "--quiet" in command
+    assert "--seed" in command
+    assert "--camera-shuffle" in command
+    assert "--deterministic" not in command
     assert "123" in command
 
 
@@ -143,6 +148,10 @@ def test_build_train_command_with_prior_spec_json(tmp_path: Path) -> None:
         protect_prior_from_densify=False,
         save_initial_snapshot=True,
         initial_render_sets=("train", "test"),
+        seed=19,
+        camera_order_seed=23,
+        camera_shuffle_enabled=False,
+        deterministic=True,
     )
     prior_spec_json = tmp_path / "priors" / "spec.json"
 
@@ -174,6 +183,12 @@ def test_build_train_command_with_prior_spec_json(tmp_path: Path) -> None:
     assert "--no-protect-prior-from-densify" in command
     assert "--save-initial-snapshot" in command
     assert "--initial-render-sets" in command
+    assert "--seed" in command
+    assert "19" in command
+    assert "--camera-order-seed" in command
+    assert "23" in command
+    assert "--no-camera-shuffle" in command
+    assert "--deterministic" in command
     assert str(prior_spec_json) in command
 
 
@@ -193,6 +208,10 @@ def test_backend_config_from_payload_parses_artifacts(tmp_path: Path) -> None:
             "sfm_region_margin_min_m": 0.03,
             "protect_prior_from_prune": False,
             "protect_prior_from_densify": True,
+            "seed": 13,
+            "camera_order_seed": 17,
+            "camera_shuffle_enabled": False,
+            "deterministic": True,
         },
         root=tmp_path,
         trainer_payload={"iterations": 15000},
@@ -215,6 +234,10 @@ def test_backend_config_from_payload_parses_artifacts(tmp_path: Path) -> None:
     assert config.sfm_region_margin_min_m == 0.03
     assert config.protect_prior_from_prune is False
     assert config.protect_prior_from_densify is True
+    assert config.seed == 13
+    assert config.camera_order_seed == 17
+    assert config.camera_shuffle_enabled is False
+    assert config.deterministic is True
 
 
 def test_propagate_prior_runtime_args_copies_diagnostic_controls(tmp_path: Path) -> None:
@@ -222,6 +245,10 @@ def test_propagate_prior_runtime_args_copies_diagnostic_controls(tmp_path: Path)
     dataset = argparse.Namespace()
     args = argparse.Namespace(
         init_mode="merge",
+        seed=31,
+        camera_order_seed=37,
+        camera_shuffle_enabled=False,
+        deterministic=True,
         save_initial_snapshot=True,
         initial_render_sets=("test",),
         initial_snapshot_convert_shs_python=False,
@@ -245,6 +272,10 @@ def test_propagate_prior_runtime_args_copies_diagnostic_controls(tmp_path: Path)
 
     backend_module.propagate_prior_runtime_args(dataset, args)
 
+    assert dataset.seed == 31
+    assert dataset.camera_order_seed == 37
+    assert dataset.camera_shuffle_enabled is False
+    assert dataset.deterministic is True
     assert dataset.prior_protection_mode == "weak"
     assert dataset.prior_lr_scale == 0.02
     assert dataset.prior_sh_reset_mode == "zero_all"
@@ -255,6 +286,49 @@ def test_propagate_prior_runtime_args_copies_diagnostic_controls(tmp_path: Path)
     assert dataset.sfm_region_margin_min_m == 0.05
     assert dataset.protect_prior_from_prune is True
     assert dataset.protect_prior_from_densify is False
+
+
+def test_resolve_determinism_settings_defaults_camera_order_seed_to_seed(tmp_path: Path) -> None:
+    backend_module = _load_backend_module(tmp_path / "fake_repo")
+    args = argparse.Namespace(seed=29, camera_order_seed=None, camera_shuffle_enabled=True, deterministic=False)
+
+    resolved = backend_module.resolve_determinism_settings(args)
+
+    assert resolved["seed"] == 29
+    assert resolved["camera_order_seed"] == 29
+    assert resolved["camera_shuffle_enabled"] is True
+    assert resolved["deterministic"] is False
+
+
+def test_shuffle_camera_infos_is_reproducible_and_locally_seeded(tmp_path: Path) -> None:
+    backend_module = _load_backend_module(tmp_path / "fake_repo")
+    train = list(range(8))
+    test = list(range(4))
+
+    first_train, first_test = backend_module.shuffle_camera_infos(
+        train,
+        test,
+        enabled=True,
+        camera_order_seed=11,
+    )
+    second_train, second_test = backend_module.shuffle_camera_infos(
+        train,
+        test,
+        enabled=True,
+        camera_order_seed=11,
+    )
+    disabled_train, disabled_test = backend_module.shuffle_camera_infos(
+        train,
+        test,
+        enabled=False,
+        camera_order_seed=11,
+    )
+
+    assert first_train == second_train
+    assert first_test == second_test
+    assert first_train != train
+    assert disabled_train == train
+    assert disabled_test == test
 
 
 def test_resolve_selected_prior_metadata_items_preserves_gaussian_entry_order(tmp_path: Path) -> None:
@@ -298,3 +372,39 @@ def test_resolve_selected_prior_metadata_items_falls_back_for_missing_entries(tm
     assert resolved[0]["prior_object_id"] == "replica_room_0_obj_6"
     assert resolved[1]["aligned_prior"] == "/tmp/aligned_prior_01.ply"
     assert resolved[1]["asset_format"] == "pointcloud"
+
+
+def test_build_prior_group_summaries_tracks_survival_by_object(tmp_path: Path) -> None:
+    backend_module = _load_backend_module(tmp_path / "fake_repo")
+
+    gaussians = argparse.Namespace()
+    gaussians._prior_point_mask = torch.tensor([True, True, False, True, False, False], dtype=torch.bool)
+    gaussians._prior_group_ids = torch.tensor([0, 0, -1, 1, -1, -1], dtype=torch.int32)
+    gaussians._prior_group_metadata = [
+        {
+            "prior_object_id": "replica_room_0_obj_6",
+            "target_object_id": 6,
+            "target_category": "lamp",
+            "inserted_point_count": 3,
+            "kept_point_count": 3,
+        },
+        {
+            "prior_object_id": "replica_room_0_obj_9",
+            "target_object_id": 9,
+            "target_category": "sofa",
+            "inserted_point_count": 2,
+            "kept_point_count": 2,
+        },
+    ]
+
+    summaries = backend_module.build_prior_group_summaries(gaussians)
+
+    assert len(summaries) == 2
+    assert summaries[0]["prior_object_id"] == "replica_room_0_obj_6"
+    assert summaries[0]["inserted_point_count"] == 3
+    assert summaries[0]["survived_point_count"] == 2
+    assert summaries[0]["survival_ratio"] == 2 / 3
+    assert summaries[1]["prior_object_id"] == "replica_room_0_obj_9"
+    assert summaries[1]["inserted_point_count"] == 2
+    assert summaries[1]["survived_point_count"] == 1
+    assert summaries[1]["survival_ratio"] == 0.5

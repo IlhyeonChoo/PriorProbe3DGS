@@ -6,11 +6,20 @@ import csv
 import json
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+import sys
+
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from priorprobe.runtime_paths import build_dated_doc_path, build_dated_report_csv_path
 
 
 @dataclass(slots=True)
@@ -188,7 +197,21 @@ def write_markdown(records: list[RunRecord], path: Path) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
+def default_csv_path(root: Path, *, when: date | datetime) -> Path:
+    return build_dated_report_csv_path(
+        root / "outputs" / "gaussian_direct",
+        slug="image_count_inventory",
+        kind="summary",
+        when=when,
+    )
+
+
+def default_markdown_path(root: Path, *, when: date | datetime) -> Path:
+    return build_dated_doc_path(root, doc_dir="notes", slug="image_count_inventory", when=when)
+
+
 def main() -> int:
+    report_date = datetime.now(UTC).date()
     parser = argparse.ArgumentParser(description="Inventory Replica experiment runs by reconstruction image count.")
     parser.add_argument(
         "--experiments-root",
@@ -199,13 +222,13 @@ def main() -> int:
     parser.add_argument(
         "--csv",
         type=Path,
-        default=ROOT / "outputs/gaussian_direct/reports/replica_image_count_inventory_2026-03-20.csv",
+        default=default_csv_path(ROOT, when=report_date),
         help="Output CSV path.",
     )
     parser.add_argument(
         "--markdown",
         type=Path,
-        default=ROOT / "docs/experiments/replica_image_count_inventory_2026-03-20.md",
+        default=default_markdown_path(ROOT, when=report_date),
         help="Output markdown path.",
     )
     args = parser.parse_args()

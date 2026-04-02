@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 _PROTECTION_MODES = {"none", "freeze", "weak"}
+_DATED_EXPERIMENT_RE = re.compile(r"^\d{2}_\d{2}_(.+)_\d{4}$")
 _DROP_TOKENS = {
     "gaussian",
     "direct",
@@ -19,6 +20,7 @@ _DROP_TOKENS = {
     "single",
     "diverse",
 }
+_ITERATION_TOKEN_RE = re.compile(r"^\d+(?:k)?$")
 
 
 def sanitize_label(value: str) -> str:
@@ -27,11 +29,8 @@ def sanitize_label(value: str) -> str:
     return normalized or "result"
 
 
-def experiment_result_label(experiment_name: str) -> str:
-    tokens = sanitize_label(experiment_name).split("_")
-    if tokens[:2] == ["gaussian", "direct"]:
-        tokens = tokens[2:]
-    while tokens and tokens[-1].isdigit():
+def _strip_label_suffix_tokens(tokens: list[str]) -> list[str]:
+    while tokens and _ITERATION_TOKEN_RE.fullmatch(tokens[-1]):
         tokens = tokens[:-1]
     if len(tokens) >= 2 and tokens[-2] == "diverse" and tokens[-1].isdigit():
         tokens = tokens[:-2]
@@ -39,8 +38,21 @@ def experiment_result_label(experiment_name: str) -> str:
         tokens = tokens[:-1]
     if tokens and tokens[-1] in _PROTECTION_MODES - {"none"}:
         tokens = tokens[:-1]
+    return tokens
+
+
+def experiment_result_label(experiment_name: str) -> str:
+    normalized = sanitize_label(experiment_name)
+    dated_match = _DATED_EXPERIMENT_RE.fullmatch(normalized)
+    if dated_match:
+        tokens = dated_match.group(1).split("_")
+    else:
+        tokens = normalized.split("_")
+    if tokens[:2] == ["gaussian", "direct"]:
+        tokens = tokens[2:]
+    tokens = _strip_label_suffix_tokens(tokens)
     filtered = [token for token in tokens if token not in _DROP_TOKENS and not token.isdigit()]
-    return "_".join(filtered) if filtered else sanitize_label(experiment_name)
+    return "_".join(filtered) if filtered else normalized
 
 
 def protection_result_label(

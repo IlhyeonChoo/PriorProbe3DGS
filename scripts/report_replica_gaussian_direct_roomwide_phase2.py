@@ -16,6 +16,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from priorprobe.experiment_storage import resolve_experiment_storage_dir
+from priorprobe.runtime_paths import build_dated_doc_path, build_dated_report_csv_path
 
 FAMILIES = {
     "object_centric_dense_384": {
@@ -215,15 +216,16 @@ def main() -> int:
 
     outputs_dir = resolve_path(args.outputs_dir)
     scene_ids = list(args.scene_ids or ["room_0", "office_0"])
+    report_date = datetime.now(UTC).date()
     output_path = (
         resolve_path(args.output)
         if args.output is not None
-        else ROOT / "docs" / "experiments" / f"replica_gaussian_direct_roomwide_phase2_{datetime.now(UTC).strftime('%Y-%m-%d')}.md"
+        else build_dated_doc_path(ROOT, doc_dir="experiment_results", slug="phase2_roomwide", when=report_date)
     )
     summary_csv_path = (
         resolve_path(args.summary_csv)
         if args.summary_csv is not None
-        else outputs_dir / "reports" / "replica_gaussian_direct_roomwide_phase2_summary.csv"
+        else build_dated_report_csv_path(outputs_dir, slug="phase2_roomwide", kind="summary", when=report_date)
     )
 
     rows, target_psnr_map = collect_rows(outputs_dir, scene_ids, args.baseline_iteration)

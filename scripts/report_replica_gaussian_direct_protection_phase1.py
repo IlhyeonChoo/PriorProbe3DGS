@@ -16,6 +16,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from priorprobe.experiment_storage import resolve_experiment_storage_dir
+from priorprobe.runtime_paths import build_dated_doc_path, build_dated_report_csv_path
 
 DATASET_FAMILIES = {
     "96_view": {
@@ -242,20 +243,21 @@ def main() -> int:
 
     outputs_dir = resolve_path(args.outputs_dir)
     scene_ids = list(args.scene_ids or ["room_0", "office_0"])
+    report_date = datetime.now(UTC).date()
     output_path = (
         resolve_path(args.output)
         if args.output is not None
-        else ROOT / "docs" / "experiments" / f"replica_gaussian_direct_protection_phase1_{datetime.now(UTC).strftime('%Y-%m-%d')}.md"
+        else build_dated_doc_path(ROOT, doc_dir="experiment_results", slug="phase1_protection", when=report_date)
     )
     summary_csv_path = (
         resolve_path(args.summary_csv)
         if args.summary_csv is not None
-        else outputs_dir / "reports" / "replica_gaussian_direct_protection_phase1_summary.csv"
+        else build_dated_report_csv_path(outputs_dir, slug="phase1_protection", kind="summary", when=report_date)
     )
     checkpoint_csv_path = (
         resolve_path(args.checkpoint_csv)
         if args.checkpoint_csv is not None
-        else outputs_dir / "reports" / "replica_gaussian_direct_protection_phase1_checkpoints.csv"
+        else build_dated_report_csv_path(outputs_dir, slug="phase1_protection", kind="checkpoints", when=report_date)
     )
 
     rows = collect_rows(outputs_dir, scene_ids)

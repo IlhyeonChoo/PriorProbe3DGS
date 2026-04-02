@@ -89,3 +89,58 @@ def test_build_oracle_target_box_alignment_payload_uses_target_box_directly(tmp_
     assert payload["translation"] == [1.0, 2.0, 0.0]
     assert payload["metadata"]["alignment_mode"] == "oracle_target_box"
     assert payload["metadata"]["center_error"] == [0.0, 0.0, 0.0]
+
+
+def test_resolve_prior_entry_assets_prefers_scale_meters_over_canonical_bbox(tmp_path: Path) -> None:
+    run_experiment = _load_run_experiment_module()
+    center_seed = tmp_path / "canonical_seed_center.ply"
+    floor_seed = tmp_path / "canonical_seed_floor.ply"
+    center_seed.write_text("ply\n", encoding="utf-8")
+    floor_seed.write_text("ply\n", encoding="utf-8")
+    canonical_metadata_path = tmp_path / "canonical_metadata.json"
+    canonical_metadata_path.write_text(
+        '{"bbox_size":[2.0,5.0,3.0],"support_type":"floor","default_anchor_mode":"floor"}',
+        encoding="utf-8",
+    )
+
+    library = PriorLibrary(
+        [
+            PriorEntry(
+                object_id="replica_room0_obj9",
+                category="sofa",
+                gaussian_path=tmp_path / "sofa.ply",
+                metadata=PriorMetadata(
+                    category="sofa",
+                    source="replica_same_scene_surface",
+                    scale_meters=(4.0, 6.0, 2.0),
+                    extras={
+                        "canonical_seed_center_path": str(center_seed),
+                        "canonical_seed_floor_path": str(floor_seed),
+                        "canonical_metadata_path": str(canonical_metadata_path),
+                        "canonical_bbox_size": [2.0, 5.0, 3.0],
+                        "canonical_anchor_mode": "floor",
+                        "support_type": "floor",
+                    },
+                ),
+            )
+        ]
+    )
+
+    seed_path, canonical_metadata, anchor_mode = run_experiment._resolve_prior_entry_assets(
+        library,
+        RetrievalResult(
+            object_id="replica_room0_obj9",
+            score=1.0,
+            mode="oracle_target_object",
+            gaussian_path=tmp_path / "sofa.ply",
+            category="sofa",
+            candidate_count=1,
+            fallback_used=False,
+        ),
+        anchor_mode="floor",
+    )
+
+    assert seed_path == floor_seed
+    assert canonical_metadata["bbox_size"] == [4.0, 6.0, 2.0]
+    assert canonical_metadata["bbox_size_source"] == "scale_meters"
+    assert anchor_mode == "floor"

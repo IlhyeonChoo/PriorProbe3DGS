@@ -17,6 +17,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from priorprobe.experiment_storage import resolve_experiment_storage_dir
+from priorprobe.runtime_paths import build_dated_doc_path
 
 
 DEFAULT_EXPERIMENTS = [
@@ -308,13 +309,11 @@ def main() -> int:
         if args.smoke
         else "gaussian_direct_baseline_from_scratch_vanilla_3dgs_multi_15000"
     )
+    report_date = datetime.now(UTC).date()
     output_path = (
         resolve_path(args.output)
         if args.output is not None
-        else ROOT
-        / "docs"
-        / "experiments"
-        / f"replica_gaussian_direct_upper_bound_{datetime.now(UTC).strftime('%Y-%m-%d')}.md"
+        else build_dated_doc_path(ROOT, doc_dir="experiment_results", slug="upper_bound", when=report_date)
     )
 
     rows = collect_rows(outputs_dir, experiments, scene_ids)

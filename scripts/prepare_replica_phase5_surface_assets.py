@@ -30,6 +30,7 @@ from priorprobe.replica_export import (
 from priorprobe.replica_surface import (
     ReplicaEGLRenderer,
     build_surface_dataset_config_payload,
+    canonicalize_gaussian_asset_to_seed_frame,
     load_colmap_camera_model,
     load_colmap_text_frames,
     object_mesh_arrays,
@@ -330,6 +331,10 @@ def copy_object_images_to_scene_crops(
     return copied
 
 
+def phase5_anchor_mode_for_category(category: str) -> str:
+    return "floor" if str(category) in {"chair", "sofa", "table", "lamp"} else "center"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Prepare Phase 5 surface-rendered Replica scene datasets and learned same-scene priors.")
     parser.add_argument("--reference-dataset-config", default=Path("configs/datasets/replica_multi_roomwide_v2_384_shared.yaml"), type=Path)
@@ -343,7 +348,7 @@ def main() -> int:
     parser.add_argument("--manifest-out", default=Path("outputs/gaussian_direct/prior_library/replica_target_surface_exact_trained_clip_manifest.json"), type=Path)
     parser.add_argument("--config-out", default=Path("outputs/gaussian_direct/prior_library/replica_target_surface_exact_trained_clip.yaml"), type=Path)
     parser.add_argument("--inventory-out", default=Path("outputs/gaussian_direct/prior_library/replica_target_surface_exact_trained_clip_inventory.json"), type=Path)
-    parser.add_argument("--report-out", default=Path("docs/experiments/replica_phase5_surface_prep_2026-03-23.md"), type=Path)
+    parser.add_argument("--report-out", default=Path("docs/notes/03-23_phase5_surface_prep_2026.md"), type=Path)
     parser.add_argument("--object-total-views", default=96, type=int)
     parser.add_argument("--object-test-views", default=16, type=int)
     parser.add_argument("--object-mesh-point-count", default=25000, type=int)
@@ -426,12 +431,20 @@ def main() -> int:
             )
             object_name = f"replica_{scene_id}_obj_{object_id}"
             category = str(target_payload["category"])
+            anchor_mode = phase5_anchor_mode_for_category(category)
+            canonicalized_point_cloud = model_path / f"canonicalized_{anchor_mode}_seed_frame.ply"
+            canonicalization_record = canonicalize_gaussian_asset_to_seed_frame(
+                final_point_cloud,
+                canonicalized_point_cloud,
+                target_payload=target_payload,
+                anchor_mode=anchor_mode,
+            )
             prior_default_objects.append(
                 {
                     "object_id": object_name,
                     "category": category,
                     "source_split": "replica_target_surface_exact",
-                    "source_gaussian_path": str(final_point_cloud),
+                    "source_gaussian_path": str(canonicalized_point_cloud),
                     "source_render_dir": str(object_scene_root / "images"),
                     "gaussian_path": str(prior_stage_root / "assets" / category / object_name / "splat.ply"),
                     "render_dir": str(prior_stage_root / "assets" / category / object_name / "renders"),
@@ -447,8 +460,11 @@ def main() -> int:
                         "same_scene_match": True,
                         "prior_source": "surface_rgb_object_training",
                         "render_backend": "pyrender_egl_vertex_color",
+                        "anchor_mode": anchor_mode,
                         "object_scene_root": str(object_scene_root),
                         "prior_training_model_path": str(model_path),
+                        "raw_prior_final_point_cloud": str(final_point_cloud),
+                        "canonicalized_source_gaussian_path": str(canonicalized_point_cloud),
                     },
                 }
             )
@@ -458,6 +474,9 @@ def main() -> int:
                     "copied_scene_crop_count": copied_crop_count,
                     "prior_training_model_path": str(model_path),
                     "prior_final_point_cloud": str(final_point_cloud),
+                    "canonicalized_prior_point_cloud": str(canonicalized_point_cloud),
+                    "anchor_mode": anchor_mode,
+                    "canonicalization": canonicalization_record,
                 }
             )
 

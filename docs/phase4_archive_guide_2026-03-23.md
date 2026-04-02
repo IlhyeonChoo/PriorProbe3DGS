@@ -29,7 +29,7 @@ Phase 1-3 실험이 완료되었다. 실험 산출물(331+ GB)을 HDD/SSD로 백
 | `src/priorprobe/` | 752 KB | 소스 코드 |
 | `scripts/` | 872 KB | 실험/리포트 스크립트 |
 | `tests/` | 436 KB | 단위 테스트 |
-| `docs/experiments/` | 240 KB | 실험 계획서 + 보고서 + Phase 5 준비 문서 |
+| `docs/experiment_plans/ + docs/experiment_results/ + docs/notes/` | 240 KB | 실험 계획서 + 결과 보고서 + 운영 노트 |
 
 ### 저장소 현황
 
@@ -69,12 +69,11 @@ Phase 1-3 실험이 완료되었다. 실험 산출물(331+ GB)을 HDD/SSD로 백
 - `outputs/gaussian_direct/prior_library/replica_target_surface_exact_trained_clip_manifest.json`
 - `outputs/gaussian_direct/prior_library/replica_target_surface_exact_trained_clip_inventory.json`
 - `outputs/gaussian_direct/prior_library/replica_target_surface_exact_trained_clip.yaml`
-- `docs/experiments/replica_phase5_surface_prep_2026-03-23.md`
+- `docs/notes/03-23_phase5_surface_prep_2026.md`
 
 아래는 **임시 Phase 5 검증 산출물**이므로 정리 대상이다.
 
 - `outputs/tmp_phase5_*`
-- `docs/experiments/replica_phase5_surface_prep_test_2026-03-23.md`
 - `outputs/gaussian_direct/reports/tmp_room0_surface_*.png`
 
 ---
@@ -104,7 +103,7 @@ Phase 1-3 실험이 완료되었다. 실험 산출물(331+ GB)을 HDD/SSD로 백
 `3dgs-data/`는 학습 데이터셋이므로 아카이브와 분리한다. 최상위에 별도 아카이브 디렉토리를 생성한다.
 
 ```bash
-mkdir -p /mnt/hddg1/priorprobe3dgs-archive/gaussian-direct/phase1-3_2026-03/{training_runs/{era0_legacy,era1_upper_bound,era2_protection,era3_roomwide_v1,era4_roomwide_v2,era5_interference,era6_phase3,smoke_tests},evaluations,prior_library,reports,legacy_prefixed,legacy_misc,configs_snapshot/{experiments,datasets},docs_snapshot/experiments}
+mkdir -p /mnt/hddg1/priorprobe3dgs-archive/gaussian-direct/phase1-3_2026-03/{training_runs/{era0_legacy,era1_upper_bound,era2_protection,era3_roomwide_v1,era4_roomwide_v2,era5_interference,era6_phase3,smoke_tests},evaluations,prior_library,reports,legacy_prefixed,legacy_misc,configs_snapshot/{experiments,datasets},docs_snapshot/{experiment_plans,experiment_results,notes}}
 ```
 
 ### 디렉토리 구조
@@ -136,7 +135,9 @@ mkdir -p /mnt/hddg1/priorprobe3dgs-archive/gaussian-direct/phase1-3_2026-03/{tra
         │   └── datasets/                 # 14 YAML
         │
         └── docs_snapshot/                # 실험 시점 문서 동결 (Phase 5 준비 문서 제외)
-            └── experiments/              # 30+ markdown
+            ├── experiment_plans/         # 실험 계획서
+            ├── experiment_results/       # 실험 결과 보고서
+            └── notes/                    # prep/bug/inventory 메모
 ```
 
 > `prior_training/`는 현재 Phase 5 surface prior만 담고 있으므로 이 문서의 아카이브 대상에서 제외한다.
@@ -336,8 +337,10 @@ rsync -av --progress --exclude 'replica_multi_roomwide_v2_384_surface_rgb_shared
   configs/datasets/ "$ARCHIVE/configs_snapshot/datasets/"
 
 # Docs snapshot (Phase 5 준비 문서 제외)
-rsync -av --progress --exclude 'replica_phase5_surface_prep*.md' \
-  docs/experiments/ "$ARCHIVE/docs_snapshot/experiments/"
+rsync -av --progress docs/experiment_plans/ "$ARCHIVE/docs_snapshot/experiment_plans/"
+rsync -av --progress docs/experiment_results/ "$ARCHIVE/docs_snapshot/experiment_results/"
+rsync -av --progress --exclude '03-23_phase5_surface_prep*.md' \
+  docs/notes/ "$ARCHIVE/docs_snapshot/notes/"
 ```
 
 ### 예상 소요 시간
@@ -508,7 +511,6 @@ rm -f outputs/gaussian_direct/reports/tmp_*.png
 
 # Phase 5 임시 검증 산출물만 삭제
 rm -rf outputs/tmp_phase5_*
-rm -f docs/experiments/replica_phase5_surface_prep_test_2026-03-23.md
 
 # conversation 로그 삭제
 rm -f conversation-*.txt
@@ -542,7 +544,9 @@ PriorProbe3DGS-gaussian/              (정리 후 outputs 기준 ~250 MB 수준,
 │   ├── experiments/                   # 81 실험 YAML
 │   └── datasets/                      # 데이터셋 YAML (Phase 5 surface config 포함)
 ├── docs/
-│   ├── experiments/                   # 30+ 실험 계획서/보고서
+│   ├── experiment_plans/              # 실험 계획서
+│   ├── experiment_results/            # 실험 결과 보고서
+│   ├── notes/                         # prep/bug/inventory 메모
 │   └── phase4_archive_guide_2026-03-23.md  # 이 문서
 ├── outputs/gaussian_direct/
 │   ├── backend_runs/                  # 비어있음 (새 실험용)

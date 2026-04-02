@@ -248,6 +248,11 @@ def _resolve_prior_entry_assets(
     anchor_mode: str,
 ) -> tuple[Path, dict[str, Any], str]:
     prior_entry = library.get(selected_prior.object_id)
+    scale_meters = (
+        list(prior_entry.metadata.scale_meters)
+        if prior_entry.metadata is not None and prior_entry.metadata.scale_meters is not None
+        else None
+    )
     metadata_extras = dict(prior_entry.metadata.extras) if prior_entry.metadata is not None else {}
     support_type = support_type_for_category(
         selected_prior.category,
@@ -269,6 +274,14 @@ def _resolve_prior_entry_assets(
             "support_type": support_type,
             "default_anchor_mode": metadata_extras.get("canonical_anchor_mode", "center"),
         }
+    else:
+        canonical_metadata = dict(canonical_metadata)
+
+    if scale_meters is not None:
+        canonical_metadata["bbox_size"] = list(scale_meters)
+        canonical_metadata["bbox_size_source"] = "scale_meters"
+    else:
+        canonical_metadata["bbox_size_source"] = canonical_metadata.get("bbox_size_source", "canonical_bbox_size")
 
     requested_anchor_mode = anchor_mode
     if requested_anchor_mode == "auto":
@@ -401,6 +414,7 @@ def _build_oracle_target_box_alignment_payload(
             "canonical_seed_path": str(canonical_seed_path),
             "prior_object_id": selected_prior.object_id,
             "prior_category": selected_prior.category,
+            "prior_reference_bbox_size": np.asarray(prior_bbox_size, dtype=np.float32).tolist(),
             "support_type": support_type,
             "anchor_mode": anchor_mode,
             "scale_mode": "anisotropic",
@@ -686,6 +700,14 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
             backend_payload["model_path"] = str(
                 experiment_storage_dir(outputs_root, "backend_runs", str(experiment["name"])) / dataset_scene.scene_id
             )
+    if args.backend_seed is not None:
+        backend_payload["seed"] = int(args.backend_seed)
+    if args.backend_camera_order_seed is not None:
+        backend_payload["camera_order_seed"] = int(args.backend_camera_order_seed)
+    if args.backend_deterministic:
+        backend_payload["deterministic"] = True
+    if args.backend_no_camera_shuffle:
+        backend_payload["camera_shuffle_enabled"] = False
 
     backend_config = Vanilla3DGSBackendConfig.from_payload(
         backend_payload,
@@ -1044,6 +1066,16 @@ def run_vanilla_3dgs_experiment(config: dict[str, Any], args: argparse.Namespace
             "sfm_region_margin_scale": backend_config.sfm_region_margin_scale,
             "sfm_region_margin_min_m": backend_config.sfm_region_margin_min_m,
         },
+        "determinism": {
+            "seed": backend_config.seed,
+            "camera_order_seed": (
+                backend_config.camera_order_seed
+                if backend_config.camera_order_seed is not None
+                else backend_config.seed
+            ),
+            "camera_shuffle_enabled": backend_config.camera_shuffle_enabled,
+            "deterministic": backend_config.deterministic,
+        },
         "status": "dry_run" if backend_config.dry_run else "pending",
         "repo_path": str(backend_config.repo_path),
         "source_path": str(backend_config.source_path),
@@ -1279,6 +1311,22 @@ def main() -> int:
     parser.add_argument("--prior-config", type=Path, help="Optional override for experiment.prior_config.")
     parser.add_argument("--backend-source-path", type=Path, help="Optional override for backend.source_path.")
     parser.add_argument("--backend-model-path", type=Path, help="Optional override for backend.model_path.")
+    parser.add_argument("--backend-seed", type=int, help="Optional override for backend.seed.")
+    parser.add_argument(
+        "--backend-camera-order-seed",
+        type=int,
+        help="Optional override for backend.camera_order_seed.",
+    )
+    parser.add_argument(
+        "--backend-deterministic",
+        action="store_true",
+        help="Enable deterministic torch/cudnn settings for the backend run.",
+    )
+    parser.add_argument(
+        "--backend-no-camera-shuffle",
+        action="store_true",
+        help="Disable backend camera shuffling entirely.",
+    )
     parser.add_argument("--outputs-dir", type=Path, help="Optional override for the outputs root directory.")
     parser.add_argument(
         "--alignment-transform-path",

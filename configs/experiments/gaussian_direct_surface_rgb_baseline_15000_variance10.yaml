@@ -1,0 +1,27 @@
+experiment:
+  name: gaussian_direct_surface_rgb_baseline_15000_variance10
+  initialization: from_scratch
+  reconstruction_backend: vanilla_3dgs
+  dataset_config: configs/datasets/replica_multi_roomwide_v2_384_surface_rgb_shared.yaml
+  insertion_representation: gaussian_direct
+
+backend:
+  repo_path: ../3DGS/gaussian-splatting
+  python_executable: ../3DGS/gaussian-splatting/venv/bin/python
+  source_path: /path/to/colmap_scene
+  model_path: CHANGE_ME_DATASET_OUTPUT
+  disable_viewer: true
+  quiet: true
+  dry_run: false
+  init_mode: merge
+
+artifacts:
+  save_initial_snapshot: true
+  initial_render_sets: [train, test]
+
+trainer:
+  iterations: 15000
+  sh_degree: 3
+  test_iterations: [500, 1000, 2000, 3000, 5000, 7000, 10000, 15000]
+  save_iterations: [500, 1000, 2000, 3000, 5000, 7000, 10000, 15000]
+  checkpoint_iterations: []

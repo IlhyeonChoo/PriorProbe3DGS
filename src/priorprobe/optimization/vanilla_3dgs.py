@@ -57,6 +57,10 @@ class Vanilla3DGSBackendConfig:
     sfm_region_margin_min_m: float = 0.02
     save_initial_snapshot: bool = False
     initial_render_sets: tuple[str, ...] = ()
+    seed: int = 42
+    camera_order_seed: int | None = None
+    camera_shuffle_enabled: bool = True
+    deterministic: bool = False
     extra_args: tuple[str, ...] = ()
 
     @classmethod
@@ -131,6 +135,14 @@ class Vanilla3DGSBackendConfig:
             sfm_region_margin_min_m=float(payload.get("sfm_region_margin_min_m", 0.02)),
             save_initial_snapshot=bool(artifacts_payload.get("save_initial_snapshot", False)),
             initial_render_sets=_as_str_tuple(artifacts_payload.get("initial_render_sets")),
+            seed=int(payload.get("seed", 42)),
+            camera_order_seed=(
+                int(payload["camera_order_seed"])
+                if payload.get("camera_order_seed") is not None
+                else None
+            ),
+            camera_shuffle_enabled=bool(payload.get("camera_shuffle_enabled", True)),
+            deterministic=bool(payload.get("deterministic", False)),
             extra_args=_as_str_tuple(payload.get("extra_args")),
         )
 
@@ -196,6 +208,12 @@ def build_train_command(
     if config.initial_render_sets:
         command.append("--initial-render-sets")
         command.extend(config.initial_render_sets)
+    command.extend(["--seed", str(config.seed)])
+    if config.camera_order_seed is not None:
+        command.extend(["--camera-order-seed", str(config.camera_order_seed)])
+    command.append("--camera-shuffle" if config.camera_shuffle_enabled else "--no-camera-shuffle")
+    if config.deterministic:
+        command.append("--deterministic")
 
     if prior_ply is not None:
         command.extend(["--prior-ply", str(prior_ply)])

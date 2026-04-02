@@ -202,7 +202,7 @@ prior를 삽입한 위치가 input image들의 시점 방향에서 보이지 않
 - hard freeze는 너무 강하다
 - `weak + prune/densify protection`이 현재 가장 유망한 다음 실험 조건이다
 
-상세 수치는 `docs/experiments/replica_gaussian_direct_prior_protection_room_0_2026-03-20.md`에 기록한다.
+상세 수치는 `docs/experiment_results/03-20_prior_protection_room_0_2026.md`에 기록한다.
 
 ## Initial Branch Success Criteria
 

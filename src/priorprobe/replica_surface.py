@@ -6,8 +6,11 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from plyfile import PlyData, PlyElement
 
+from priorprobe.gaussian_affine import detect_asset_format, transform_gaussian_vertex
 from priorprobe.replica_export import CameraFrame, _load_mesh_arrays, _sample_mesh_triangles
+from priorprobe.replica_export import quaternion_xyzw_to_rotation_matrix
 
 
 @dataclass(slots=True)
@@ -148,6 +151,84 @@ def sample_object_mesh_points(
         seed=seed,
     )
     return samples.astype(np.float32), colors.astype(np.uint8)
+
+
+def target_payload_anchor_and_rotation(
+    target_payload: dict[str, Any],
+    *,
+    anchor_mode: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    center = np.asarray(target_payload["center"], dtype=np.float32)
+    sizes = np.asarray(target_payload["sizes"], dtype=np.float32)
+    rotation_matrix = quaternion_xyzw_to_rotation_matrix(
+        np.asarray(target_payload["rotation_xyzw"], dtype=np.float32)
+    ).astype(np.float32)
+    if anchor_mode == "floor":
+        anchor = center + rotation_matrix @ np.asarray(
+            [0.0, 0.0, -float(sizes[2]) * 0.5],
+            dtype=np.float32,
+        )
+        return anchor.astype(np.float32), rotation_matrix
+    if anchor_mode == "center":
+        return center.astype(np.float32), rotation_matrix
+    raise ValueError(f"Unsupported anchor_mode: {anchor_mode}")
+
+
+def canonicalize_gaussian_asset_to_seed_frame(
+    source_path: Path,
+    output_path: Path,
+    *,
+    target_payload: dict[str, Any],
+    anchor_mode: str,
+) -> dict[str, Any]:
+    ply = PlyData.read(source_path)
+    vertex = np.array(ply["vertex"].data, copy=True)
+    if detect_asset_format(vertex) != "gaussian":
+        raise ValueError(f"Expected gaussian asset: {source_path}")
+
+    anchor_world, rotation_matrix = target_payload_anchor_and_rotation(
+        target_payload,
+        anchor_mode=anchor_mode,
+    )
+    canonical_vertex = transform_gaussian_vertex(
+        vertex,
+        rotation_matrix=rotation_matrix.T,
+        scale=np.ones(3, dtype=np.float32),
+        translation=np.asarray((-anchor_world) @ rotation_matrix, dtype=np.float32),
+    )
+
+    xyz = np.stack(
+        [
+            np.asarray(canonical_vertex["x"], dtype=np.float32),
+            np.asarray(canonical_vertex["y"], dtype=np.float32),
+            np.asarray(canonical_vertex["z"], dtype=np.float32),
+        ],
+        axis=1,
+    )
+    bbox_min = xyz.min(axis=0).astype(np.float32)
+    bbox_max = xyz.max(axis=0).astype(np.float32)
+    bbox_center = ((bbox_min + bbox_max) * 0.5).astype(np.float32)
+    if anchor_mode == "floor":
+        seed_shift = np.asarray([bbox_center[0], bbox_center[1], bbox_min[2]], dtype=np.float32)
+    else:
+        seed_shift = bbox_center
+
+    canonical_vertex["x"] = (xyz[:, 0] - seed_shift[0]).astype(np.float32)
+    canonical_vertex["y"] = (xyz[:, 1] - seed_shift[1]).astype(np.float32)
+    canonical_vertex["z"] = (xyz[:, 2] - seed_shift[2]).astype(np.float32)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    PlyData([PlyElement.describe(canonical_vertex, "vertex")]).write(output_path)
+
+    return {
+        "source_path": str(source_path),
+        "output_path": str(output_path),
+        "anchor_mode": anchor_mode,
+        "anchor_world": anchor_world.tolist(),
+        "seed_shift": seed_shift.tolist(),
+        "canonical_bbox_min_before_shift": bbox_min.tolist(),
+        "canonical_bbox_max_before_shift": bbox_max.tolist(),
+    }
 
 
 class ReplicaEGLRenderer:

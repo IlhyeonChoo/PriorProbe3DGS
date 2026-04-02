@@ -1,0 +1,7 @@
+family_id,group,label,experiment_name,scene_id,prior_lr_scale,protect_from_prune,protect_from_densify,prior_original_total,prior_kept_total,prior_0,prior_3000,prior_15000,prior_survival_3000,prior_survival_15000,prior_densified_3000,prior_densified_15000,target_psnr,time_to_target_sec,total_time_sec,iter_0_psnr,iter_0_ssim,iter_0_lpips,iter_0_gaussians,iter_3000_psnr,iter_3000_ssim,iter_3000_lpips,iter_3000_gaussians,iter_15000_psnr,iter_15000_ssim,iter_15000_lpips,iter_15000_gaussians
+baseline,reference,baseline,03-21-baseline-rw-v2-384-15k-2026,room_0,0.05,True,True,0,0,,,,,,,,,,692.3747557080351,,,,,,,,,,,,
+prior_100k,reference,prior 100K current,03-21-samescene-rw-v2-384-15k-2026,room_0,0.05,True,True,0,0,,,,,,,,,,714.8504251777194,,,,,,,,,,,,
+prior_25k_current,reference,A 25K current,03-23-samescene-rw-v2-384-prior25k-15k-2026,room_0,0.05,True,True,100000,25000,,,,,,,,,,712.6845968835987,,,,,,,,,,,,
+prior_25k_lr01,phase3,lr_0.1,03-22-samescene-rw-v2-384-prior25k-lr01-15k-2026,room_0,0.1,True,True,100000,25000,,,,,,,,,,715.4432373181917,,,,,,,,,,,,
+prior_25k_lr10,phase3,lr_1.0,03-22-samescene-rw-v2-384-prior25k-lr10-15k-2026,room_0,1.0,True,True,100000,25000,,,,,,,,,,712.4918125909753,,,,,,,,,,,,
+prior_25k_full_none,phase3,full_none,03-22-samescene-rw-v2-384-prior25k-fullnone-15k-2026,room_0,1.0,False,False,100000,25000,,,,,,,,,,707.5788487889804,,,,,,,,,,,,

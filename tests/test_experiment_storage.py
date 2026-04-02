@@ -31,6 +31,14 @@ def test_storage_experiment_name_keeps_name_for_other_output_roots() -> None:
     )
 
 
+def test_storage_experiment_name_keeps_dated_name_for_branch_outputs() -> None:
+    outputs_root = Path("outputs/gaussian_direct")
+
+    assert storage_experiment_name("03-24-prior25k-15k-2026", outputs_root=outputs_root) == (
+        "03-24-prior25k-15k-2026"
+    )
+
+
 def test_resolve_experiment_storage_dir_prefers_shortened_directory(tmp_path: Path) -> None:
     outputs_root = tmp_path / "gaussian_direct"
     shortened = experiment_storage_dir(outputs_root, "experiments", "gaussian_direct_demo_run")

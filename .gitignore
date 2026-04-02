@@ -58,7 +58,8 @@ venv/
 !/logs/.gitkeep
 
 # Local assistant and staging scratch files
-/CLAUDE.md
-/AGENTS.md
+/CLAUDE.md*
+/AGENTS.md*
 /docs/git_staging_guide*.md
 *.txt
+handoff*

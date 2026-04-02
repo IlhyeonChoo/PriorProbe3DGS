@@ -18,6 +18,7 @@ if str(SRC) not in sys.path:
 
 from priorprobe.evaluation.metrics import summarize_backend_run
 from priorprobe.experiment_storage import resolve_experiment_storage_dir
+from priorprobe.runtime_paths import build_dated_doc_path, build_dated_report_csv_path
 
 
 EXPERIMENTS = {
@@ -133,6 +134,8 @@ def main() -> int:
     parser.add_argument("--outputs-dir", type=Path, default=ROOT / "outputs" / "gaussian_direct")
     parser.add_argument("--scene-id", type=str, default="room_0")
     args = parser.parse_args()
+    report_date = datetime.now(UTC).date()
+    report_slug = f"interference_combinations_{args.scene_id}"
 
     rows: list[dict[str, Any]] = []
     baseline_target_psnr: float | None = None
@@ -233,9 +236,13 @@ def main() -> int:
                 }
             )
 
-    reports_dir = args.outputs_dir / "reports"
-    summary_csv = reports_dir / f"replica_gaussian_direct_interference_combinations_{args.scene_id}_summary.csv"
-    checkpoints_csv = reports_dir / f"replica_gaussian_direct_interference_combinations_{args.scene_id}_checkpoints.csv"
+    summary_csv = build_dated_report_csv_path(args.outputs_dir, slug=report_slug, kind="summary", when=report_date)
+    checkpoints_csv = build_dated_report_csv_path(
+        args.outputs_dir,
+        slug=report_slug,
+        kind="checkpoints",
+        when=report_date,
+    )
     write_csv(
         summary_csv,
         [
@@ -302,7 +309,7 @@ def main() -> int:
     lines = [
         "# Replica Gaussian-Direct Interference Combinations",
         "",
-        f"- Date: {datetime.now(UTC).date().isoformat()}",
+        f"- Date: {report_date.isoformat()}",
         f"- Scene: `{args.scene_id}`",
         "- Dataset family: `roomwide_v2_384`",
         "- 비교 기준: baseline / prior 100K none / A prior_25k / 진단 실험 핵심(B, C)",
@@ -396,7 +403,8 @@ def main() -> int:
             ]
         )
 
-    report_path = ROOT / "docs" / "experiments" / f"replica_gaussian_direct_interference_combinations_{args.scene_id}_{datetime.now(UTC).date().isoformat()}.md"
+    report_path = build_dated_doc_path(ROOT, doc_dir="experiment_results", slug=report_slug, when=report_date)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"Saved report to {report_path}")
     print(f"Saved summary CSV to {summary_csv}")

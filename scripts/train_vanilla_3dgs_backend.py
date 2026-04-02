@@ -5,6 +5,7 @@ import argparse
 import importlib
 import json
 import os
+import random
 import shutil
 import sys
 import types
@@ -99,6 +100,48 @@ def normalize_sfm_region_replacement_mode(value: str | None) -> str:
     return normalized
 
 
+def resolve_determinism_settings(args: argparse.Namespace) -> dict[str, Any]:
+    seed = int(getattr(args, "seed", 42))
+    camera_order_seed = getattr(args, "camera_order_seed", None)
+    if camera_order_seed is None:
+        camera_order_seed = seed
+    return {
+        "seed": seed,
+        "camera_order_seed": int(camera_order_seed),
+        "camera_shuffle_enabled": bool(getattr(args, "camera_shuffle_enabled", True)),
+        "deterministic": bool(getattr(args, "deterministic", False)),
+    }
+
+
+def apply_determinism_settings(*, seed: int, deterministic: bool) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    if deterministic and hasattr(torch.backends, "cudnn"):
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+
+def shuffle_camera_infos(
+    train_cam_infos: list[Any],
+    test_cam_infos: list[Any],
+    *,
+    enabled: bool,
+    camera_order_seed: int,
+) -> tuple[list[Any], list[Any]]:
+    train_ordered = list(train_cam_infos)
+    test_ordered = list(test_cam_infos)
+    if not enabled:
+        return train_ordered, test_ordered
+
+    random.Random(int(camera_order_seed)).shuffle(train_ordered)
+    random.Random(int(camera_order_seed) + 1).shuffle(test_ordered)
+    return train_ordered, test_ordered
+
+
 def build_prior_protection_config(args: argparse.Namespace) -> dict[str, Any]:
     mode = normalize_prior_protection_mode(getattr(args, "prior_protection_mode", "none"))
     lr_scale = float(getattr(args, "prior_lr_scale", 0.05))
@@ -149,6 +192,10 @@ def extend_prior_mask(gaussians, extra_count: int) -> None:
         return
     extension = torch.zeros((int(extra_count),), dtype=torch.bool, device=mask.device)
     gaussians._prior_point_mask = torch.cat((mask, extension), dim=0)
+    group_ids = getattr(gaussians, "_prior_group_ids", None)
+    if group_ids is not None:
+        group_extension = torch.full((int(extra_count),), -1, dtype=group_ids.dtype, device=group_ids.device)
+        gaussians._prior_group_ids = torch.cat((group_ids, group_extension), dim=0)
 
 
 def prune_prior_mask(gaussians, valid_points_mask: torch.Tensor) -> None:
@@ -156,14 +203,46 @@ def prune_prior_mask(gaussians, valid_points_mask: torch.Tensor) -> None:
     if mask is None:
         return
     gaussians._prior_point_mask = mask[valid_points_mask]
+    group_ids = getattr(gaussians, "_prior_group_ids", None)
+    if group_ids is not None:
+        gaussians._prior_group_ids = group_ids[valid_points_mask]
+
+
+def build_prior_group_summaries(gaussians) -> list[dict[str, Any]]:
+    mask = getattr(gaussians, "_prior_point_mask", None)
+    group_ids = getattr(gaussians, "_prior_group_ids", None)
+    group_metadata = list(getattr(gaussians, "_prior_group_metadata", []))
+    if mask is None or group_ids is None or not group_metadata:
+        return []
+
+    summaries: list[dict[str, Any]] = []
+    for group_index, metadata in enumerate(group_metadata):
+        group_mask = torch.logical_and(mask, group_ids == int(group_index))
+        survived_count = int(group_mask.sum().item())
+        inserted_count = int(
+            metadata.get(
+                "inserted_point_count",
+                metadata.get("protected_point_count", metadata.get("kept_point_count", 0)),
+            )
+            or 0
+        )
+        summary = dict(metadata)
+        summary["group_index"] = int(group_index)
+        summary["inserted_point_count"] = inserted_count
+        summary["survived_point_count"] = survived_count
+        summary["survival_ratio"] = float(survived_count / inserted_count) if inserted_count > 0 else None
+        summaries.append(summary)
+    return summaries
 
 
 def configure_prior_protection(gaussians, *, args: argparse.Namespace, selected_priors: list[dict[str, Any]]) -> None:
     config = build_prior_protection_config(args)
     total_count = int(gaussians.get_xyz.shape[0])
     mask = torch.zeros((total_count,), dtype=torch.bool, device="cuda")
+    group_ids = torch.full((total_count,), -1, dtype=torch.int32, device="cuda")
     protected_ranges: list[dict[str, Any]] = []
-    for item in selected_priors:
+    group_metadata: list[dict[str, Any]] = []
+    for group_index, item in enumerate(selected_priors):
         start = item.get("protected_index_start")
         end = item.get("protected_index_end")
         if start is None or end is None:
@@ -173,18 +252,37 @@ def configure_prior_protection(gaussians, *, args: argparse.Namespace, selected_
         if start_index < 0 or end_index <= start_index or end_index > total_count:
             continue
         mask[start_index:end_index] = True
+        group_ids[start_index:end_index] = int(group_index)
         protected_ranges.append(
             {
                 "prior_object_id": item.get("prior_object_id"),
                 "target_object_id": item.get("target_object_id"),
+                "target_category": item.get("target_category"),
                 "asset_format": item.get("asset_format"),
                 "start_index": start_index,
                 "end_index": end_index,
                 "point_count": end_index - start_index,
             }
         )
+        group_metadata.append(
+            {
+                "prior_object_id": item.get("prior_object_id"),
+                "target_object_id": item.get("target_object_id"),
+                "target_category": item.get("target_category"),
+                "asset_format": item.get("asset_format"),
+                "original_point_count": int(item.get("original_point_count", 0) or 0),
+                "kept_point_count": int(item.get("kept_point_count", 0) or 0),
+                "inserted_point_count": int(
+                    item.get("inserted_point_count", item.get("kept_point_count", 0)) or 0
+                ),
+                "start_index": start_index,
+                "end_index": end_index,
+            }
+        )
     gaussians._prior_protection_config = config
     gaussians._prior_point_mask = mask
+    gaussians._prior_group_ids = group_ids
+    gaussians._prior_group_metadata = group_metadata
     gaussians._prior_protected_ranges = protected_ranges
 
 
@@ -224,6 +322,7 @@ def write_prior_protection_checkpoint(model_path: Path, iteration: int, gaussian
         "protected_point_count": int(mask.sum().item()),
         "total_point_count": int(gaussians.get_xyz.shape[0]),
         "protected_ranges": list(getattr(gaussians, "_prior_protected_ranges", [])),
+        "group_summaries": build_prior_group_summaries(gaussians),
     }
     (point_cloud_path / "prior_protection.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
     save_gaussian_subset_ply(
@@ -648,6 +747,7 @@ def apply_insertion_policy(prior_pcd, prepared_item: dict[str, Any], *, init_mod
     if dropped:
         updated["applied_point_keep_ratio"] = 0.0
         updated["kept_point_count"] = 0
+        updated["inserted_point_count"] = 0
         updated["dropped"] = True
         return None, updated
 
@@ -659,11 +759,13 @@ def apply_insertion_policy(prior_pcd, prepared_item: dict[str, Any], *, init_mod
         )
         updated["applied_point_keep_ratio"] = float(kept_count / max(original_count, 1))
         updated["kept_point_count"] = kept_count
+        updated["inserted_point_count"] = kept_count
         updated["dropped"] = False
         return sampled_pcd, updated
 
     updated["applied_point_keep_ratio"] = 1.0
     updated["kept_point_count"] = original_count
+    updated["inserted_point_count"] = original_count
     updated["dropped"] = False
     return prior_pcd, updated
 
@@ -735,6 +837,7 @@ def apply_gaussian_insertion_policy(
     if dropped:
         updated["applied_point_keep_ratio"] = 0.0
         updated["kept_point_count"] = 0
+        updated["inserted_point_count"] = 0
         updated["dropped"] = True
         return None, updated
 
@@ -751,6 +854,7 @@ def apply_gaussian_insertion_policy(
         )
     updated["applied_point_keep_ratio"] = float(keep_count / max(original_count, 1))
     updated["kept_point_count"] = int(processed.shape[0])
+    updated["inserted_point_count"] = int(processed.shape[0])
     updated["dropped"] = False
     return processed, updated
 
@@ -983,6 +1087,10 @@ def save_initial_snapshot(scene, args) -> None:
 
 def propagate_prior_runtime_args(dataset: Any, args: argparse.Namespace) -> None:
     setattr(dataset, "init_mode", args.init_mode)
+    setattr(dataset, "seed", int(getattr(args, "seed", 42)))
+    setattr(dataset, "camera_order_seed", int(getattr(args, "camera_order_seed", getattr(args, "seed", 42))))
+    setattr(dataset, "camera_shuffle_enabled", bool(getattr(args, "camera_shuffle_enabled", True)))
+    setattr(dataset, "deterministic", bool(getattr(args, "deterministic", False)))
     setattr(dataset, "save_initial_snapshot", bool(getattr(args, "save_initial_snapshot", False)))
     setattr(dataset, "initial_render_sets", tuple(getattr(args, "initial_render_sets", ("train", "test"))))
     setattr(
@@ -1032,6 +1140,7 @@ def make_prior_init_scene():
             self._prior_protection_mode = str(getattr(args, "prior_protection_mode", "none"))
             self._protect_prior_from_prune = bool(getattr(args, "protect_prior_from_prune", False))
             self._protect_prior_from_densify = bool(getattr(args, "protect_prior_from_densify", False))
+            self._determinism = resolve_determinism_settings(args)
 
             if load_iteration:
                 if load_iteration == -1:
@@ -1127,11 +1236,12 @@ def make_prior_init_scene():
                 with open(os.path.join(self.model_path, "cameras.json"), "w", encoding="utf-8") as file:
                     json.dump(json_cams, file)
 
-            if shuffle:
-                import random
-
-                random.shuffle(train_cam_infos)
-                random.shuffle(test_cam_infos)
+            train_cam_infos, test_cam_infos = shuffle_camera_infos(
+                train_cam_infos,
+                test_cam_infos,
+                enabled=bool(shuffle) and self._determinism["camera_shuffle_enabled"],
+                camera_order_seed=int(self._determinism["camera_order_seed"]),
+            )
 
             self.cameras_extent = scene_info.nerf_normalization["radius"]
 
@@ -1193,6 +1303,7 @@ def make_prior_init_scene():
                         current_selected_priors[0]["protected_index_start"] = 0
                         current_selected_priors[0]["protected_index_end"] = total_points
                         current_selected_priors[0]["protected_point_count"] = total_points
+                        current_selected_priors[0]["inserted_point_count"] = total_points
                     configure_prior_protection(
                         self.gaussians,
                         args=args,
@@ -1245,12 +1356,14 @@ def make_prior_init_scene():
                             updated_item["protected_index_start"] = None
                             updated_item["protected_index_end"] = None
                             updated_item["protected_point_count"] = 0
+                            updated_item["inserted_point_count"] = 0
                             updated_selected_priors.append(updated_item)
                             continue
                         kept_point_count = int(np.asarray(filtered_pcd.points).shape[0])
                         updated_item["protected_index_start"] = current_point_index
                         updated_item["protected_index_end"] = current_point_index + kept_point_count
                         updated_item["protected_point_count"] = kept_point_count
+                        updated_item["inserted_point_count"] = kept_point_count
                         current_point_index += kept_point_count
                         updated_selected_priors.append(updated_item)
                         merged_pcd = merge_point_clouds(merged_pcd, filtered_pcd)
@@ -1278,9 +1391,11 @@ def make_prior_init_scene():
                             updated_item["protected_index_start"] = None
                             updated_item["protected_index_end"] = None
                             updated_item["protected_point_count"] = 0
+                            updated_item["inserted_point_count"] = 0
                             updated_selected_priors.append(updated_item)
                             continue
                         updated_item["protected_point_count"] = int(filtered_vertex.shape[0])
+                        updated_item["inserted_point_count"] = int(filtered_vertex.shape[0])
                         gaussian_vertices_to_append.append((filtered_vertex, updated_item))
                         updated_selected_priors.append(updated_item)
                     if gaussian_vertices_to_append and sfm_region_replacement_mode == "aligned_prior_aabb_union":
@@ -1305,6 +1420,7 @@ def make_prior_init_scene():
                         updated_item["protected_index_start"] = current_gaussian_index
                         updated_item["protected_index_end"] = current_gaussian_index + point_count
                         updated_item["protected_point_count"] = point_count
+                        updated_item["inserted_point_count"] = point_count
                         append_gaussian_vertex_to_model(self.gaussians, gaussian_vertex)
                         current_gaussian_index += point_count
                     configure_prior_protection(
@@ -1373,6 +1489,10 @@ def write_render_compatible_cfg_args(model_path: Path, args: argparse.Namespace)
         "max_train_cameras",
         "camera_quality_ratio",
         "camera_selection_seed",
+        "seed",
+        "camera_order_seed",
+        "camera_shuffle_enabled",
+        "deterministic",
         "eval",
         "convert_SHs_python",
         "compute_cov3D_python",
@@ -1409,6 +1529,11 @@ def build_parser() -> tuple[argparse.ArgumentParser, Any, Any, Any]:
         choices=["train", "test"],
         default=("train", "test"),
     )
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--camera-order-seed", type=int, default=None)
+    parser.add_argument("--camera-shuffle", dest="camera_shuffle_enabled", action="store_true", default=True)
+    parser.add_argument("--no-camera-shuffle", dest="camera_shuffle_enabled", action="store_false")
+    parser.add_argument("--deterministic", action="store_true", default=False)
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default=None)
     parser.add_argument("--prior-ply", type=Path)
@@ -1451,6 +1576,12 @@ def main() -> int:
     parser, lp, op, pp = build_parser()
     args = parser.parse_args()
     args.repo_path = args.repo_path.resolve()
+    determinism = resolve_determinism_settings(args)
+    args.seed = determinism["seed"]
+    args.camera_order_seed = determinism["camera_order_seed"]
+    args.camera_shuffle_enabled = determinism["camera_shuffle_enabled"]
+    args.deterministic = determinism["deterministic"]
+    apply_determinism_settings(seed=args.seed, deterministic=args.deterministic)
 
     prepared_init_ply = None
     prepared_asset_format = None

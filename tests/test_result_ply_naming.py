@@ -32,6 +32,21 @@ def test_result_ply_filename_encodes_experiment_and_protection() -> None:
     )
 
 
+def test_result_ply_filename_supports_dated_experiment_names() -> None:
+    assert experiment_result_label("03-24-prior25k-15k-2026") == "prior25k"
+    assert experiment_result_label("03-30-baseline-rep2-15k-2026") == "baseline_rep2"
+    assert (
+        result_ply_filename(
+            experiment_name="03-24-prior25k-weak-15k-2026",
+            iteration=3000,
+            protection_mode="weak",
+            protect_from_prune=True,
+            protect_from_densify=True,
+        )
+        == "prior25k_weak_protect_prune_densify_iter_3000.ply"
+    )
+
+
 def test_infer_experiment_name_handles_scene_and_non_scene_model_paths(tmp_path: Path) -> None:
     scene_model_path = tmp_path / "backend_runs" / "gaussian_direct_same_scene_exact_clip_15000" / "room_0"
     bare_model_path = tmp_path / "backend_runs" / "gaussian_direct_merge_tiny_room_0"
