@@ -63,3 +63,4 @@ venv/
 /docs/git_staging_guide*.md
 *.txt
 handoff*
+agents_next*
