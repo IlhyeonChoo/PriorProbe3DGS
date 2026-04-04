@@ -59,7 +59,7 @@ venv/
 
 # Local assistant and staging scratch files
 /CLAUDE.md*
-/AGENTS.md*
+#/AGENTS.md*
 /docs/git_staging_guide*.md
 *.txt
 handoff*

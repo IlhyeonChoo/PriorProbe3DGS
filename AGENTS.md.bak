@@ -1,0 +1,192 @@
+# AGENTS.md — exp/gaussian-direct
+
+이 파일은 `PriorProbe3DGS-gaussian` worktree에서 작업하는 AI 에이전트를 위한 운영 지침이다.
+
+## 기본 원칙
+
+- 사용자와는 **한국어로** 소통한다.
+- 터미널 쉘은 **zsh + oh-my-zsh** 기준으로 본다.
+- 이 브랜치의 핵심 목적은 **prior Gaussian 집합을 직접 삽입하는 경로**를 검증하는 것이다.
+- 새 실험은 특별한 비교 목적이 없는 한 **point cloud proxy 경로로 되돌리지 않는다**.
+- 사용자가 `계획서를 만들었으니 진행해`, `허가 없이 진행해`, `결과만 기록해`라고 한 경우에는 **추가 확인 없이 실행**한다.
+- 질문이 필요할 때는 정말로 실험 정의가 갈라지는 경우에만 짧게 묻는다.
+
+## 현재 브랜치 상태
+
+### 실험 해석 시 반드시 알고 있어야 하는 점
+
+- `roomwide_96/192/384`는 **legacy biased room-wide**다.
+  - 특정 1개 축의 왕복 시점에 과도하게 몰린 데이터셋이다.
+  - neutral room scan처럼 취급하지 않는다.
+- `roomwide_v2_96/192/384`는 위 편향을 줄이기 위해 만든 **balanced azimuth** 계열이다.
+- 이 브랜치에서 공유용 산출물은 보통 아래 두 위치를 기준으로 본다.
+  - `docs/experiment_plans/*.md`
+  - `docs/experiment_results/*.md`
+  - `docs/notes/*.md`
+  - `outputs/gaussian_direct/reports/*.{csv,json,md}`
+
+### 현재까지의 working conclusion
+
+- `room_0`, `roomwide_v2_384` 기준 간섭 진단/조합 실험에서는
+  - `A prior_25k (none)`이 가장 안정적인 기본 정책이다.
+  - `weak` 보호 모드는 현재까지는 기본 정책보다 낫다고 보기 어렵다.
+- 이 결론은 **새 실험 계획서가 명시적으로 덮어쓰지 않는 한 기본 출발점**으로 사용한다.
+
+## 작업 시작 전 확인 순서
+
+새 작업을 시작할 때는 아래 순서로 현재 상태를 확인한다.
+
+1. 사용자가 직접 지정한 계획서
+   - 예: `docs/experiment_plans/03-24_phase5_count_sweep_geo_30k_extension_2026.md`
+2. `docs/gaussian_direct_branch_plan.md`
+3. `docs/experiment_results/` 아래 최신 날짜 보고서
+4. 관련 `docs/notes/` 문서
+5. 관련 `configs/experiments/*.yaml`
+6. 관련 `configs/datasets/*.yaml`
+7. 이미 실행된 결과
+   - `outputs/gaussian_direct/experiments/`
+   - `outputs/gaussian_direct/reports/`
+
+같은 조건의 실험이 이미 있으면 중복 실행하지 말고 재사용 가능성을 먼저 본다.
+
+## 실험 계획 확정 규칙
+
+- 사용자가 특정 계획서를 가리켰다면 그 계획서를 **우선 기준**으로 삼는다.
+- 계획서가 없으면 문서와 기존 결과를 읽고 합리적인 다음 단계를 제안한다.
+- 실험을 새로 추가할 때는 아래를 명확히 한다.
+  - 비교군
+  - scene
+  - dataset family
+  - iteration 수
+  - prior insertion 조건
+  - protection 조건
+  - 보고서 위치
+- 이미 계획이 확정된 상태라면 다시 승인을 기다리지 않는다.
+
+## 코드 수정 원칙
+
+- 수정 전 대상 파일을 반드시 읽는다.
+- gaussian-direct 전용 로직은 pointcloud 경로와 분리해서 넣는다.
+- 공통 모듈을 건드릴 때는 pointcloud 쪽 의미가 깨지지 않는지 확인한다.
+- 새 실험 config 이름은 `gaussian_direct_` prefix를 붙인다.
+- 새 dataset config는 기존 naming 체계를 유지한다.
+- 결과 PLY naming 규칙은 현재 구현을 따른다.
+  - 실파일: `{design}[_protection]_iter_{N}.ply`
+  - 호환용 링크: `point_cloud.ply`
+
+## 실험 실행 규칙
+
+### 기본 환경
+
+- Python: `3.11`
+- 패키지 관리: `uv`
+- 기본 테스트: `uv run pytest tests/ -v`
+- 실험 실행: `uv run python scripts/run_experiment.py ...`
+
+### 실행 절차
+
+1. 새 config면 먼저 `--dry-run`
+2. 짧은 smoke가 필요한지 판단
+3. 본 실행
+4. `evaluation.json`, `backend_run.json`, 필요시 보고서 갱신
+
+### 주의사항
+
+- 실험 산출물은 `outputs/gaussian_direct/` 아래에만 둔다.
+- 기존 실험을 덮어쓰지 않는다.
+- `_backup_` 디렉토리가 생기면 필요 여부를 판단하고, 사용자가 원하면 정리한다.
+- smoke 산출물은 재현에 불필요하면 정리 대상이 될 수 있다.
+
+## 데이터셋 관련 지침
+
+### Replica / room-wide
+
+- room-wide exporter를 수정할 때는 **camera distribution**을 반드시 확인한다.
+- 단순히 view 개수만 늘리지 말고, `room_center` 기준 **position azimuth 분포**를 본다.
+- 특정 1~2개 방향에 대부분이 몰리면 실패로 본다.
+- 새 room-wide 계열은 legacy와 섞지 말고 새 family 이름으로 분리한다.
+
+### GT 이미지 해석
+
+- `scene_meta.json`의 `render_backend`를 확인한다.
+- `semantic_point_renderer`면 GT가 점처럼 보이는 것이 정상이다.
+- viewer나 qualitative 해석에서 이를 실제 RGB 사진처럼 취급하지 않는다.
+
+## 보고서 작성 규칙
+
+- 새 실험 결과는 기존 보고서를 덮어쓰지 말고 `docs/experiment_results/` 아래에 새 파일로 기록한다.
+- 파일명 형식:
+  - `docs/experiment_results/{MM-DD}_{slug}_{YYYY}.md`
+- 보고서에는 최소한 아래를 포함한다.
+  - 실험 목적
+  - config / dataset / scene
+  - 핵심 지표
+  - 비교군과의 차이
+  - 해석
+  - 다음 단계
+
+### CSV / markdown 출력
+
+- 보고용 CSV는 항상 **LF line ending**으로 쓴다.
+- 보고용 CSV/JSON/Markdown의 canonical 위치는:
+  - `outputs/gaussian_direct/reports/`
+
+## inspection viewer 규칙
+
+- `outputs/gaussian_direct/backend_runs/*/*/inspection/` 아래의
+  - `viewer.html`
+  - `initial_*_contact_sheet.png`
+  - `prior_projection_sheet.png`
+  등은 **generated artifact**다.
+- 이 파일들은 GitHub에 올리지 않는다.
+- 필요하면 스크립트로 재생성한다.
+  - `scripts/build_initial_snapshot_viewer.py`
+  - `scripts/build_recent_inspection_viewers.py`
+
+## Git / 정리 정책
+
+### Git에 올릴 것
+
+- 코드
+- config
+- 테스트
+- `docs/experiment_plans/*.md`
+- `docs/experiment_results/*.md`
+- `docs/notes/*.md`
+- `outputs/gaussian_direct/reports/*.{csv,json,md}`
+
+### Git에 올리지 않을 것
+
+- `outputs/**/backend_runs/**`
+- `outputs/**/experiments/**`
+- `outputs/**/prior_library/**`
+- `outputs/**/inspection/**`
+- 대용량 실험 산출물
+- `docs/git_staging_guide*.md`
+
+### .gitignore
+
+- `.gitignore`는 단순하게 유지한다.
+- `outputs`는 **summary report만 남기고 run artifact는 전부 무시**하는 방향을 기본으로 한다.
+- 줄바꿈 경고가 반복되면 생성 스크립트 쪽을 먼저 고친다.
+
+## 정리 작업 원칙
+
+- 사용자가 요청하지 않은 대량 삭제는 하지 않는다.
+- 다만 아래는 사용자가 원하면 정리해도 된다.
+  - smoke backend 산출물
+  - `_backup_` 디렉토리
+  - inspection viewer 산출물
+- 정리 작업을 했으면 무엇을 왜 지웠는지 문서나 응답에 남긴다.
+
+## 커뮤니케이션 원칙
+
+- 결과 수치만 나열하지 말고 원인 가설까지 함께 적는다.
+- 단일 scene 결과를 전체 결론처럼 말하지 않는다.
+- 기대와 다른 결과가 나오면 실패로 단정하지 말고
+  - 데이터 편향
+  - SH mismatch
+  - overlap interference
+  - prior density
+  - protection
+  같은 분리 가능한 원인으로 쪼개서 본다.
