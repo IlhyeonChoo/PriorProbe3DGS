@@ -67,6 +67,14 @@ All repository paths below are relative to the repository root unless otherwise 
   - Real file: `{design}[_protection]_iter_{N}.ply`
   - Compatibility link: `point_cloud.ply`
 
+## Prior Geometry Checks
+
+- Prior geometry correctness must be checked twice for gaussian-direct runs that insert priors.
+- Stage 1 is a blocking `prior-runtime` gate that runs immediately after aligned prior preparation and before optimization. If it fails, write the validation payload and stop the run.
+- Stage 2 is an advisory `quality-gate` audit that runs before result interpretation or reporting. Reports may continue after an advisory failure only if geometry risk and uncertainty are stated explicitly.
+- `report-writer`, result-analysis, and planning work must use the `quality-gate` audit result for geometry correctness claims instead of re-closing the review ad hoc.
+- Detailed procedure, shared checks, thresholds, and output contract live in `.codex/skills/prior-geometry-check/SKILL.md`.
+
 ## Source of Truth
 
 - Check context in this order before new work:
@@ -91,9 +99,10 @@ All repository paths below are relative to the repository root unless otherwise 
 ## Execution and Reporting Rules
 
 - `prior-builder` work must not silently change training-loop or optimizer behavior unless the task is explicitly about initialization inputs for prior construction.
-- `prior-runtime` work must not silently change prior provenance fields, insertion semantics, or the meaning of the pointcloud baseline.
+- `prior-runtime` work must not silently change prior provenance fields, insertion semantics, or the meaning of the pointcloud baseline, and must follow the blocking prior-geometry gate in `.codex/skills/prior-geometry-check/SKILL.md` when priors are inserted.
 - `experiment-runner` work must execute an explicit spec and must not invent settings to force a run to succeed.
-- `quality-gate` work is review-first: prefer identifying evidence gaps, consistency problems, and risks over direct edits.
+- `report-writer` work must synthesize existing artifacts into evidence-grounded notes or reports and must not smooth over missing evidence.
+- `quality-gate` work is review-first: prefer identifying evidence gaps, consistency problems, and risks over direct edits, and own the advisory prior-geometry audit in `.codex/skills/prior-geometry-check/SKILL.md`.
 - When adding a new experiment, explicitly state comparison target, scene, dataset family, iteration count, prior insertion condition, protection condition, output directory, and report location.
 - Do not reuse an existing output directory for a materially different run.
 - Do not perform large deletions unless the user explicitly requested them.
@@ -113,6 +122,11 @@ All repository paths below are relative to the repository root unless otherwise 
 - Delegate bounded tasks whenever practical: artifact collection, targeted code-path checks, config drafting, dry-runs, smoke checks, consistency review.
 - Delegated tasks should have a small scope and a clear write set.
 - Delegate long-running training or experiment execution to the local `experiment-runner` agent only when the user explicitly asks to run, continue, resume, or launch an experiment.
+- Delegate result-note drafting, cross-run summaries, and report updates to the local `report-writer` agent when the main need is to synthesize existing evidence rather than execute or modify runtime behavior.
+- When the main session or any planning, result-analysis, or report-writing agent needs to confirm implementation details, feature behavior, config semantics, or whether a code path exists, delegate that verification to the implementation- or review-oriented subagent responsible for that scope and consume only the returned findings plus the minimal supporting evidence.
+- Planning, result-analysis, and report-writing agents must not perform deep source inspection themselves just to answer implementation questions. They may do only the minimal routing needed to choose the correct delegate and evaluate the returned evidence.
+- Request delegated verification in a decision-oriented format: conclusion, evidence paths or artifacts, key caveats, and next recommended action. Do not pull back raw exploratory detail unless the user explicitly asks for it.
+- This delegation rule does not apply when the task itself is direct code review, patch review, or source-level correctness assessment. Those review tasks must inspect the relevant code directly.
 - Request delegated results in this format:
   - `files or paths checked`
   - `commands or artifacts verified`
