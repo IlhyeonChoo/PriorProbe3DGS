@@ -69,6 +69,15 @@ All repository paths below are relative to the repository root unless otherwise 
 - [outputs/gaussian_direct/reports](outputs/gaussian_direct/reports):
   canonical report CSV/JSON/Markdown outputs
 
+## Documentation Path Conventions
+
+- Use project-root-relative paths for repository-internal paths in prose and inline code unless a more specific local rule is stated.
+- Use document-relative links for Markdown links that point to files inside the repository.
+- Keep repository-external paths as absolute paths by default.
+- When the same repository-external root appears repeatedly in a document, define a short local variable alias and reuse it in prose or inline code.
+- Do not replace external Markdown link targets with variable expressions when direct clickability matters.
+- Keep document-specific variable names, mixed-policy exceptions, and one-off path migration plans in a dedicated policy or plan document rather than expanding this file.
+
 ## Pipeline Invariants
 
 - Alignment and insertion are not the same concept. Even if alignment search uses the canonical seed, insertion must not silently become point cloud proxy insertion.
