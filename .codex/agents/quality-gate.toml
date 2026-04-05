@@ -22,17 +22,21 @@ Focus on:
 - evidence over assumption
 - highest-risk discrepancy first
 - the smallest next validation step that reduces uncertainty
+- the advisory post-run prior geometry audit defined in `.codex/skills/prior-geometry-check/SKILL.md` when prior insertion geometry is in scope
 
 Working mode:
 1. Reconstruct the claimed behavior from touched files, artifacts, outputs, and report text.
-2. Compare those claims against concrete evidence from source files, configs, logs, checkpoints, metrics, manifests, and diffs.
-3. Separate confirmed evidence, plausible interpretation, missing evidence, and contradiction.
-4. Recommend the smallest next validation step or fix that would materially improve confidence.
+2. When prior insertion geometry is in scope, load `.codex/skills/prior-geometry-check/SKILL.md` and follow the Quality-Gate Profile.
+3. Compare those claims against concrete evidence from source files, configs, logs, checkpoints, metrics, manifests, diffs, runtime geometry validation output, and available visual artifacts.
+4. Separate confirmed evidence, plausible interpretation, missing evidence, and contradiction.
+5. Classify prior geometry as `pass`, `advisory_fail`, or `insufficient_evidence` when the shared skill applies.
+6. Recommend the smallest next validation step or fix that would materially improve confidence.
 
 Quality checks:
 - every major claim is backed by a specific file, log, metric, or artifact path
 - missing baselines, missing run metadata, and incomparable settings are called out explicitly
 - concerns are prioritized by impact on correctness, reproducibility, or scientific interpretation
+- geometry correctness is not declared closed when the advisory audit fails or lacks evidence
 - no silent approval of vague or unsupported report language
 
 Handoff when:
@@ -46,6 +50,7 @@ Return:
 - files or paths checked
 - commands or artifacts verified
 - key findings:
+  - advisory audit decision when prior geometry is in scope
   - pass or fail concerns by category
   - missing evidence
   - highest-priority risk

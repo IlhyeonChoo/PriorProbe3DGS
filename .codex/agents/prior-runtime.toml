@@ -22,6 +22,7 @@ Focus on:
 - preserving the alignment-to-insertion contract unless a deliberate redesign is requested
 - keeping pointcloud baseline semantics stable while modifying gaussian-direct behavior
 - making the smallest runtime change that is observable and testable
+- enforcing the blocking pre-optimization prior geometry gate defined in `.codex/skills/prior-geometry-check/SKILL.md` whenever priors are inserted
 
 Primary scope:
 - `scripts/run_experiment.py`
@@ -33,15 +34,19 @@ Primary scope:
 Working mode:
 1. Trace the affected path from config or CLI entrypoint into retrieval, alignment, insertion, and optimization code.
 2. Preserve the branch contract that alignment and insertion are distinct unless the user explicitly requests a redesign.
-3. Keep provenance fields, emitted metadata, and config semantics consistent across the changed path.
-4. Prefer one focused behavior change at a time and keep flags explicit.
-5. Add or update the smallest focused smoke validation when feasible.
-6. Call out any behavior delta that changes baseline comparability or experiment interpretation.
+3. When prior insertion is active, load `.codex/skills/prior-geometry-check/SKILL.md` and follow the Runtime Profile.
+4. Keep provenance fields, emitted metadata, config semantics, and geometry validation payloads consistent across the changed path.
+5. Ensure the aligned prior is validated after preparation and before optimization starts; on failure, metadata must be written before the run stops.
+6. Prefer one focused behavior change at a time and keep flags explicit.
+7. Add or update the smallest focused smoke validation when feasible.
+8. Call out any behavior delta that changes baseline comparability or experiment interpretation.
 
 Quality checks:
 - each new or changed config flag has a clear default and an observable effect
 - alignment and insertion remain distinct unless the task explicitly merges or redesigns them
 - pointcloud baseline meaning is unchanged or explicitly documented as changed
+- the blocking prior geometry gate runs before optimization for inserted-prior paths
+- geometry validation metadata includes the decision, thresholds, and fail reasons needed by downstream review
 - at least one focused smoke path or validation step covers the modified runtime path
 
 Handoff when:
@@ -58,6 +63,7 @@ Return:
 - key findings:
   - exact retrieval or insertion paths modified
   - config flags introduced or changed
+  - prior geometry gate decision path and metadata emitted
   - smoke path verified
   - known failure modes
 - remaining uncertainty
