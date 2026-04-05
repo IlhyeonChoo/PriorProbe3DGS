@@ -1,5 +1,10 @@
 # Replica Gaussian-Direct Upper Bound
 
+## External Roots
+
+- `DATA_STAGE_ROOT=/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs`
+- `REPLICA_MULTI_DIVERSE_384_ROOT=${DATA_STAGE_ROOT}/replica_colmap_multi_diverse_384`
+
 ## Assumptions
 
 - Prior insertion uses `gaussian_direct` rather than point-cloud proxy conversion.
@@ -9,7 +14,7 @@
 
 ## Dataset
 
-- Dense dataset root: `/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi_diverse_384`
+- Dense dataset root: `${REPLICA_MULTI_DIVERSE_384_ROOT}`
 - Views per scene: `320 train + 64 test = 384`
 - Selection mode: `diverse_azimuth`
 - `room_0` azimuth histogram: `48, 49, 48, 48, 48, 48, 48, 47`

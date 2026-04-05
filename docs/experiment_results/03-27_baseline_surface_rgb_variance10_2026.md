@@ -1,5 +1,10 @@
 # Replica Gaussian-Direct Surface RGB Baseline Variance (10 repeats, 2026-03-27)
 
+## External Roots
+
+- `DATA_STAGE_ROOT=/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs`
+- `SURFACE_SCENE_DATASET_ROOT=${DATA_STAGE_ROOT}/replica_colmap_multi_roomwide_v2_384_surface_rgb`
+
 ## Scope
 
 - Experiment family: `surface_rgb_baseline_15000_variance01~10`
@@ -10,8 +15,8 @@
 
 ## Same-Condition Check
 
-- `room_0` source_path: `/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi_roomwide_v2_384_surface_rgb/room_0`
-- `office_0` source_path: `/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi_roomwide_v2_384_surface_rgb/office_0`
+- `room_0` source_path: `${SURFACE_SCENE_DATASET_ROOT}/room_0`
+- `office_0` source_path: `${SURFACE_SCENE_DATASET_ROOT}/office_0`
 
 ## Summary
 

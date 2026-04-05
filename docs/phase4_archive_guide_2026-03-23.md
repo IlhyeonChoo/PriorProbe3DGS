@@ -96,6 +96,12 @@ Phase 1-3 실험이 완료되었다. 실험 산출물(331+ GB)을 HDD/SSD로 백
 
 **삭제 전 반드시 `git rm --cached`로 tracking을 해제하고, HDD 백업이 완료된 후에만 물리적 삭제를 진행한다.**
 
+## Runbook Variables
+
+- `DATA_STAGE_ROOT=/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs`
+- `ARCHIVE_ROOT=/mnt/hddg1/priorprobe3dgs-archive`
+- `SSD_INDEX_ROOT=${DATA_STAGE_ROOT}/gaussian_direct_index`
+
 ---
 
 ## Step 1: HDD 아카이브 디렉토리 생성
@@ -103,7 +109,10 @@ Phase 1-3 실험이 완료되었다. 실험 산출물(331+ GB)을 HDD/SSD로 백
 `3dgs-data/`는 학습 데이터셋이므로 아카이브와 분리한다. 최상위에 별도 아카이브 디렉토리를 생성한다.
 
 ```bash
-mkdir -p /mnt/hddg1/priorprobe3dgs-archive/gaussian-direct/phase1-3_2026-03/{training_runs/{era0_legacy,era1_upper_bound,era2_protection,era3_roomwide_v1,era4_roomwide_v2,era5_interference,era6_phase3,smoke_tests},evaluations,prior_library,reports,legacy_prefixed,legacy_misc,configs_snapshot/{experiments,datasets},docs_snapshot/{experiment_plans,experiment_results,notes}}
+ARCHIVE_ROOT=/mnt/hddg1/priorprobe3dgs-archive
+ARCHIVE_PHASE_ROOT="${ARCHIVE_ROOT}/gaussian-direct/phase1-3_2026-03"
+
+mkdir -p "${ARCHIVE_PHASE_ROOT}"/{training_runs/{era0_legacy,era1_upper_bound,era2_protection,era3_roomwide_v1,era4_roomwide_v2,era5_interference,era6_phase3,smoke_tests},evaluations,prior_library,reports,legacy_prefixed,legacy_misc,configs_snapshot/{experiments,datasets},docs_snapshot/{experiment_plans,experiment_results,notes}}
 ```
 
 ### 디렉토리 구조
@@ -272,7 +281,9 @@ same_scene_exact_clip_roomwide_v2_384_prior_25k_full_none_15000
 예시 (era0):
 
 ```bash
-cd /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian
+cd "$(git rev-parse --show-toplevel)"
+ARCHIVE_ROOT=/mnt/hddg1/priorprobe3dgs-archive
+ARCHIVE_PHASE_ROOT="${ARCHIVE_ROOT}/gaussian-direct/phase1-3_2026-03"
 
 for dir in oracle_prior_vanilla_3dgs oracle_prior_vanilla_3dgs_clip \
   oracle_prior_vanilla_3dgs_multi_clip oracle_prior_vanilla_3dgs_multi_clip_15000 \
@@ -290,7 +301,7 @@ for dir in oracle_prior_vanilla_3dgs oracle_prior_vanilla_3dgs_clip \
   baseline_from_scratch_vanilla_3dgs_multi \
   baseline_from_scratch_vanilla_3dgs_multi_15000; do
   rsync -av --progress "outputs/gaussian_direct/backend_runs/$dir/" \
-    "/mnt/hddg1/priorprobe3dgs-archive/gaussian-direct/phase1-3_2026-03/training_runs/era0_legacy/$dir/"
+    "${ARCHIVE_PHASE_ROOT}/training_runs/era0_legacy/$dir/"
 done
 ```
 
@@ -299,7 +310,9 @@ done
 ### 2-2: 나머지 데이터
 
 ```bash
-ARCHIVE=/mnt/hddg1/priorprobe3dgs-archive/gaussian-direct/phase1-3_2026-03
+ARCHIVE_ROOT=/mnt/hddg1/priorprobe3dgs-archive
+ARCHIVE_PHASE_ROOT="${ARCHIVE_ROOT}/gaussian-direct/phase1-3_2026-03"
+ARCHIVE="$ARCHIVE_PHASE_ROOT"
 SRC=outputs/gaussian_direct
 
 # Evaluations (46 MB)
@@ -354,7 +367,9 @@ HDD 쓰기 속도 ~150 MB/s 기준, training_runs 331 GB → 약 37분. 전체 �
 **반드시 검증 후에만 Step 5(삭제)로 진행한다.**
 
 ```bash
-ARCHIVE=/mnt/hddg1/priorprobe3dgs-archive/gaussian-direct/phase1-3_2026-03
+ARCHIVE_ROOT=/mnt/hddg1/priorprobe3dgs-archive
+ARCHIVE_PHASE_ROOT="${ARCHIVE_ROOT}/gaussian-direct/phase1-3_2026-03"
+ARCHIVE="$ARCHIVE_PHASE_ROOT"
 
 # 거친 파일 수/용량 비교
 find outputs/gaussian_direct/backend_runs/ -type f | wc -l
@@ -383,7 +398,10 @@ rsync -avnc --delete outputs/gaussian_direct/reports/ "$ARCHIVE/reports/"
 ### 4-1: 디렉토리 생성
 
 ```bash
-mkdir -p /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/gaussian_direct_index/{evaluations,reports,prior_manifests,configs/{experiments,datasets}}
+DATA_STAGE_ROOT=/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs
+SSD_INDEX_ROOT="${DATA_STAGE_ROOT}/gaussian_direct_index"
+
+mkdir -p "${SSD_INDEX_ROOT}"/{evaluations,reports,prior_manifests,configs/{experiments,datasets}}
 ```
 
 ### 4-2: 구조
@@ -402,7 +420,9 @@ mkdir -p /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/gaussian_direct_index/{evaluati
 ### 4-3: 데이터 복사
 
 ```bash
-SSD_INDEX=/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/gaussian_direct_index
+DATA_STAGE_ROOT=/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs
+SSD_INDEX_ROOT="${DATA_STAGE_ROOT}/gaussian_direct_index"
+SSD_INDEX="$SSD_INDEX_ROOT"
 SRC=outputs/gaussian_direct
 
 # evaluation.json + backend_run.json만 선별 복사
@@ -466,7 +486,7 @@ find configs/datasets -maxdepth 1 -name '*.yaml' ! -name 'replica_multi_roomwide
 HDD 백업 완료 후 실행.
 
 ```bash
-cd /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian
+cd "$(git rev-parse --show-toplevel)"
 
 # 바이너리 파일 git tracking 해제 (물리 파일은 유지)
 git ls-files -z outputs/gaussian_direct/backend_runs | \
@@ -488,7 +508,7 @@ git ls-files -z outputs/gaussian_direct/backend_runs | \
 **Step 3(검증) 완료 후에만 실행한다.**
 
 ```bash
-cd /home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian
+cd "$(git rev-parse --show-toplevel)"
 
 # backend_runs 전체 삭제 (331 GB 회수)
 rm -rf outputs/gaussian_direct/backend_runs/*/
@@ -566,8 +586,11 @@ PriorProbe3DGS-gaussian/              (정리 후 outputs 기준 ~250 MB 수준,
 
 ```bash
 # 예: era5의 prior_25k 실험 복원
+ARCHIVE_ROOT=/mnt/hddg1/priorprobe3dgs-archive
+ARCHIVE_PHASE_ROOT="${ARCHIVE_ROOT}/gaussian-direct/phase1-3_2026-03"
+
 rsync -av --progress \
-  /mnt/hddg1/priorprobe3dgs-archive/gaussian-direct/phase1-3_2026-03/training_runs/era5_interference/same_scene_exact_clip_roomwide_v2_384_prior_25k_15000/ \
+  "${ARCHIVE_PHASE_ROOT}/training_runs/era5_interference/same_scene_exact_clip_roomwide_v2_384_prior_25k_15000/" \
   outputs/gaussian_direct/backend_runs/same_scene_exact_clip_roomwide_v2_384_prior_25k_15000/
 ```
 

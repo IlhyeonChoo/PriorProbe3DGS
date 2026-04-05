@@ -1,5 +1,10 @@
 # Replica Gaussian-Direct Surface RGB Baseline Variance (2026-03-27)
 
+## External Roots
+
+- `DATA_STAGE_ROOT=/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs`
+- `SURFACE_SCENE_DATASET_ROOT=${DATA_STAGE_ROOT}/replica_colmap_multi_roomwide_v2_384_surface_rgb`
+
 ## Purpose
 
 `surface_rgb` 15K baseline을 최근 여러 번 반복 실행한 결과를 모아서 run-to-run 분산 범위를 확인한다.
@@ -20,8 +25,8 @@
 ## Same-Condition Check
 
 - 모든 run의 `source_path`는 scene별로 동일하다.
-  - `room_0`: `/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi_roomwide_v2_384_surface_rgb/room_0`
-  - `office_0`: `/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi_roomwide_v2_384_surface_rgb/office_0`
+  - `room_0`: `${SURFACE_SCENE_DATASET_ROOT}/room_0`
+  - `office_0`: `${SURFACE_SCENE_DATASET_ROOT}/office_0`
 - `fixscale` 변경은 prior insertion 경로용 수정이므로 baseline code path 자체는 같다.
 
 ## Broad Variance

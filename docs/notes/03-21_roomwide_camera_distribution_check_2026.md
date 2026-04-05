@@ -43,11 +43,16 @@ Date: 2026-03-21
 - 모든 camera가 `room_center`를 바라보도록 고정되어 있어서, position이 한 축에 몰리면 forward direction도 그 반대 2방향으로 함께 몰린다.
 - 현재 `scene_visible_ratio > 0` 조건과 candidate ranking이 결합되면서 valid candidate 자체가 한 축으로 편향됐다.
 
+## External Roots
+
+- `DATA_STAGE_ROOT=/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs`
+- `ROOMWIDE_192_ROOT=${DATA_STAGE_ROOT}/replica_colmap_multi_roomwide_192`
+
 ## Relevant Code / Metadata
 
-- selection and acceptance: [replica_export.py](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/src/priorprobe/replica_export.py#L966)
-- test split assignment: [replica_export.py](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/src/priorprobe/replica_export.py#L1005)
-- scene meta histogram write: [replica_export.py](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/src/priorprobe/replica_export.py#L1047)
+- selection and acceptance: [replica_export.py](../../src/priorprobe/replica_export.py#L966)
+- test split assignment: [replica_export.py](../../src/priorprobe/replica_export.py#L1005)
+- scene meta histogram write: [replica_export.py](../../src/priorprobe/replica_export.py#L1047)
 - room_0 192 scene meta: [scene_meta.json](/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi_roomwide_192/room_0/scene_meta.json)
 - office_0 192 scene meta: [scene_meta.json](/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi_roomwide_192/office_0/scene_meta.json)
 

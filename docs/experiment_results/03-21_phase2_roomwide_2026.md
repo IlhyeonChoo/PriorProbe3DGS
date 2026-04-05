@@ -31,4 +31,4 @@
 
 ## Artifact
 
-- Summary CSV: `/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/reports/replica_gaussian_direct_roomwide_phase2_summary.csv`
+- Summary CSV: `../../outputs/gaussian_direct/reports/replica_gaussian_direct_roomwide_phase2_summary.csv`

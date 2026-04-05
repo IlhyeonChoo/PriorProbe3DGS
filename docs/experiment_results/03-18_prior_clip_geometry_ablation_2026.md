@@ -23,7 +23,7 @@ Date: 2026-03-18
 
 ## Implementation Note
 
-- The first `weighted_merge` and `filtered_merge` runs exposed an `init_mode` propagation bug in [train_vanilla_3dgs_backend.py](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS/scripts/train_vanilla_3dgs_backend.py), where the backend defaulted back to `merge`.
+- The first `weighted_merge` and `filtered_merge` runs exposed an `init_mode` propagation bug in [train_vanilla_3dgs_backend.py](../../scripts/train_vanilla_3dgs_backend.py), where the backend defaulted back to `merge`.
 - The fix was to propagate `args.init_mode` into the runtime dataset object before scene construction.
 - All `clip_geom weighted_merge` and `clip_geom filtered_merge` numbers below are from reruns after that fix.
 

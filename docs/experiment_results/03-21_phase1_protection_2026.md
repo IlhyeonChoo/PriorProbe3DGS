@@ -30,5 +30,5 @@
 
 ## Artifacts
 
-- Summary CSV: `/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/reports/replica_gaussian_direct_protection_phase1_summary.csv`
-- Checkpoint CSV: `/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/reports/replica_gaussian_direct_protection_phase1_checkpoints.csv`
+- Summary CSV: `../../outputs/gaussian_direct/reports/replica_gaussian_direct_protection_phase1_summary.csv`
+- Checkpoint CSV: `../../outputs/gaussian_direct/reports/replica_gaussian_direct_protection_phase1_checkpoints.csv`

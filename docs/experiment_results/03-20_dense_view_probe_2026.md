@@ -2,12 +2,17 @@
 
 - 목적: 현재 Replica reconstruction 입력이 실제로 데이터 부족인지, 아니면 export 설정이 보수적인지 확인한다.
 - 기준 scene: `room_0`, `office_0`
-- 현재 multi-object 실험 dataset root: `/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi`
+
+## External Roots
+
+- `DATA_STAGE_ROOT=/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs`
+- `REPLICA_MULTI_ROOT=${DATA_STAGE_ROOT}/replica_colmap_multi`
 
 ## Existing Staging
 
 - raw Replica root에는 18개 scene이 존재한다.
 - 실제 학습 입력은 raw를 직접 읽지 않고, `images + sparse/0`를 갖춘 processed subset scene만 사용한다.
+- 현재 multi-object 실험 dataset root: `${REPLICA_MULTI_ROOT}`
 - 현재 multi-object gaussian-direct 실험은 `room_0`, `office_0` 두 scene만 stage돼 있고, 각 scene은 96장이다.
 - 기존 결과 inventory는 [03-20_image_count_inventory_2026.md](../notes/03-20_image_count_inventory_2026.md)에 정리했다.
 

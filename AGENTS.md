@@ -2,6 +2,7 @@
 
 This file is the repo-local contract for the `PriorProbe3DGS-gaussian` worktree.
 Keep global defaults in the user-level `AGENTS.md`; this file records only the meaning and operational boundaries required for this branch.
+All repository paths below are relative to the repository root unless otherwise noted.
 
 ## Project Scope
 
@@ -33,39 +34,39 @@ Keep global defaults in the user-level `AGENTS.md`; this file records only the m
 
 ## Repository Map
 
-- [scripts/run_experiment.py](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/scripts/run_experiment.py):
+- [scripts/run_experiment.py](scripts/run_experiment.py):
   experiment entrypoint, retrieval/alignment/insertion wiring, backend launch metadata
-- [scripts/train_vanilla_3dgs_backend.py](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/scripts/train_vanilla_3dgs_backend.py):
+- [scripts/train_vanilla_3dgs_backend.py](scripts/train_vanilla_3dgs_backend.py):
   backend training entrypoint for vanilla 3DGS runs launched from experiment orchestration
-- [scripts/evaluate.py](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/scripts/evaluate.py):
+- [scripts/evaluate.py](scripts/evaluate.py):
   evaluation entrypoint that reads backend run summaries and computes reconstruction metrics
-- [scripts/export_results.py](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/scripts/export_results.py):
+- [scripts/export_results.py](scripts/export_results.py):
   report/export entrypoint for summary markdown and CSV artifacts under the gaussian-direct output root
-- [src/priorprobe/prior_library/library.py](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/src/priorprobe/prior_library/library.py):
+- [src/priorprobe/prior_library/library.py](src/priorprobe/prior_library/library.py):
   prior manifest registry
-- [src/priorprobe/retrieval/retriever.py](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/src/priorprobe/retrieval/retriever.py):
+- [src/priorprobe/retrieval/retriever.py](src/priorprobe/retrieval/retriever.py):
   retrieval selection logic
-- [src/priorprobe/insertion](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/src/priorprobe/insertion):
+- [src/priorprobe/insertion](src/priorprobe/insertion):
   alignment search, transform payload generation, insertion-side helpers
-- [src/priorprobe/optimization/vanilla_3dgs.py](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/src/priorprobe/optimization/vanilla_3dgs.py):
+- [src/priorprobe/optimization/vanilla_3dgs.py](src/priorprobe/optimization/vanilla_3dgs.py):
   backend config and command construction
-- [src/priorprobe/optimization/trainer.py](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/src/priorprobe/optimization/trainer.py):
+- [src/priorprobe/optimization/trainer.py](src/priorprobe/optimization/trainer.py):
   training-side orchestration helpers shared by experiment launch code
-- [src/priorprobe/runtime_paths.py](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/src/priorprobe/runtime_paths.py):
+- [src/priorprobe/runtime_paths.py](src/priorprobe/runtime_paths.py):
   dated docs/report path helpers
 - `outputs/gaussian_direct/experiments/**/backend_run.json`:
   canonical per-run source of truth for provenance, backend launch settings, and downstream evaluation/reporting inputs
-- [configs/experiments](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/configs/experiments):
+- [configs/experiments](configs/experiments):
   experiment presets
-- [configs/datasets](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/configs/datasets):
+- [configs/datasets](configs/datasets):
   dataset family definitions
-- [docs/experiment_plans](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/docs/experiment_plans):
+- [docs/experiment_plans](docs/experiment_plans):
   approved or candidate experiment specs
-- [docs/experiment_results](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/docs/experiment_results):
+- [docs/experiment_results](docs/experiment_results):
   dated milestone reports
-- [docs/notes](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/docs/notes):
+- [docs/notes](docs/notes):
   bug notes, diagnostics, supporting observations
-- [outputs/gaussian_direct/reports](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/reports):
+- [outputs/gaussian_direct/reports](outputs/gaussian_direct/reports):
   canonical report CSV/JSON/Markdown outputs
 
 ## Pipeline Invariants
@@ -97,10 +98,10 @@ Keep global defaults in the user-level `AGENTS.md`; this file records only the m
 - `experiment-runner`-style work must execute an explicit spec and must not invent settings or alter retrieval/insertion semantics to force a run to succeed.
 - `quality-gate`-style work is review-first: prefer identifying evidence gaps, consistency problems, and risks over direct edits.
 - When starting new work, check the source of truth in the following order.
-  1. Relevant latest documents under [docs/experiment_plans](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/docs/experiment_plans)
-  2. Relevant latest documents under [docs/experiment_results](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/docs/experiment_results)
-  3. Relevant documents under [docs/notes](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/docs/notes)
-  4. Relevant [configs/experiments](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/configs/experiments) and [configs/datasets](/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/configs/datasets)
+  1. Relevant latest documents under [docs/experiment_plans](docs/experiment_plans)
+  2. Relevant latest documents under [docs/experiment_results](docs/experiment_results)
+  3. Relevant documents under [docs/notes](docs/notes)
+  4. Relevant [configs/experiments](configs/experiments) and [configs/datasets](configs/datasets)
   5. Existing artifacts under `outputs/gaussian_direct/`
 - If the same experimental condition already exists, check whether it can be reused before launching a duplicate run.
 - When adding a new experiment, explicitly specify the comparison target, scene, dataset family, iteration count, prior insertion condition, protection condition, and report location.

@@ -2,10 +2,15 @@
 
 Date: 2026-03-20
 
+## External Roots
+
+- `DATA_STAGE_ROOT=/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs`
+- `REPLICA_MULTI_DIVERSE_384_ROOT=${DATA_STAGE_ROOT}/replica_colmap_multi_diverse_384`
+
 ## Setup
 
 - Scene: `room_0`
-- Dataset: `/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi_diverse_384`
+- Dataset: `${REPLICA_MULTI_DIVERSE_384_ROOT}`
 - Views: `320 train + 64 test = 384`
 - Prior condition: `same_scene_exact`
 - Insertion: `gaussian_direct`
