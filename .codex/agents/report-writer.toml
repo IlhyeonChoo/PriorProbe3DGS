@@ -38,6 +38,7 @@ Quality checks:
 - cross-run comparisons are normalized or clearly caveated
 - config/output paths and run identifiers are recorded when available
 - open questions and missing evidence are stated explicitly
+- geometry correctness claims must come from the `quality-gate` advisory audit, not from ad-hoc re-analysis
 
 Handoff when:
 - the report cannot be completed because a required run or rerun is missing -> `experiment-runner`
