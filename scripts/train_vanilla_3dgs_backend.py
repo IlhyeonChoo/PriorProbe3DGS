@@ -85,6 +85,196 @@ PipelineParams = arguments_module.PipelineParams
 
 PRIOR_TENSOR_GROUPS = ("xyz", "f_dc", "f_rest", "opacity", "scaling", "rotation")
 
+GEOMETRY_VALIDATION_OUTSIDE_SCENE_PROXY_RATIO_THRESHOLD = 0.01
+GEOMETRY_VALIDATION_MEAN_NN_THRESHOLD_M = 0.5
+GEOMETRY_VALIDATION_MAX_PRIOR_POINTS = 2048
+GEOMETRY_VALIDATION_MAX_SCENE_POINTS = 8192
+GEOMETRY_VALIDATION_SCENE_BBOX_TOLERANCE_M = 0.01
+GEOMETRY_VALIDATION_METADATA_ERROR_THRESHOLD_M = 0.05
+
+
+def geometry_bbox_summary(xyz: np.ndarray) -> dict[str, Any]:
+    points = np.asarray(xyz, dtype=np.float64)
+    if points.ndim != 2 or points.shape[1] != 3 or points.shape[0] == 0:
+        raise ValueError("xyz must be a non-empty Nx3 array")
+    bbox_min = points.min(axis=0)
+    bbox_max = points.max(axis=0)
+    center = (bbox_min + bbox_max) * 0.5
+    size = bbox_max - bbox_min
+    bottom_center = np.asarray([center[0], center[1], bbox_min[2]], dtype=np.float64)
+    return {
+        "min": bbox_min.tolist(),
+        "max": bbox_max.tolist(),
+        "center": center.tolist(),
+        "size": size.tolist(),
+        "bottom_center": bottom_center.tolist(),
+    }
+
+
+def _sample_xyz(points: np.ndarray, *, max_points: int, seed: int) -> np.ndarray:
+    xyz = np.asarray(points, dtype=np.float32)
+    if xyz.shape[0] <= max_points:
+        return xyz
+    rng = np.random.default_rng(int(seed))
+    indices = np.sort(rng.choice(xyz.shape[0], size=int(max_points), replace=False))
+    return xyz[indices]
+
+
+def _nearest_scene_proxy_distances(
+    prior_xyz: np.ndarray,
+    scene_xyz: np.ndarray,
+    *,
+    max_prior_points: int,
+    max_scene_points: int,
+    seed: int,
+) -> np.ndarray:
+    sampled_prior = _sample_xyz(prior_xyz, max_points=max_prior_points, seed=seed)
+    sampled_scene = _sample_xyz(scene_xyz, max_points=max_scene_points, seed=seed + 1)
+    prior_tensor = torch.from_numpy(sampled_prior).to(dtype=torch.float32, device="cpu")
+    scene_tensor = torch.from_numpy(sampled_scene).to(dtype=torch.float32, device="cpu")
+    distances = torch.cdist(prior_tensor, scene_tensor).min(dim=1).values
+    return distances.cpu().numpy().astype(np.float64)
+
+
+def validate_prior_geometry_against_scene_proxy(
+    prior_xyz: np.ndarray,
+    scene_xyz: np.ndarray,
+    metadata_item: dict[str, Any] | None = None,
+    *,
+    outside_ratio_threshold: float = GEOMETRY_VALIDATION_OUTSIDE_SCENE_PROXY_RATIO_THRESHOLD,
+    mean_nn_threshold_m: float = GEOMETRY_VALIDATION_MEAN_NN_THRESHOLD_M,
+    max_prior_points: int = GEOMETRY_VALIDATION_MAX_PRIOR_POINTS,
+    max_scene_points: int = GEOMETRY_VALIDATION_MAX_SCENE_POINTS,
+    seed: int = 0,
+) -> dict[str, Any]:
+    prior_xyz = np.asarray(prior_xyz, dtype=np.float64)
+    scene_xyz = np.asarray(scene_xyz, dtype=np.float64)
+    prior_bbox = geometry_bbox_summary(prior_xyz)
+    scene_bbox = geometry_bbox_summary(scene_xyz)
+    scene_min = np.asarray(scene_bbox["min"], dtype=np.float64)
+    scene_max = np.asarray(scene_bbox["max"], dtype=np.float64)
+    outside_mask = np.any(
+        (prior_xyz < scene_min[None, :]) | (prior_xyz > scene_max[None, :]),
+        axis=1,
+    )
+    outside_ratio = float(outside_mask.mean()) if prior_xyz.size else 0.0
+    nn_distances = _nearest_scene_proxy_distances(
+        prior_xyz,
+        scene_xyz,
+        max_prior_points=max_prior_points,
+        max_scene_points=max_scene_points,
+        seed=int(seed),
+    )
+    debug = dict((metadata_item or {}).get("alignment_debug") or {})
+    aligned_center = np.asarray(prior_bbox["center"], dtype=np.float64)
+    aligned_bottom = np.asarray(prior_bbox["bottom_center"], dtype=np.float64)
+    aligned_size = np.asarray(prior_bbox["size"], dtype=np.float64)
+    bbox_tolerance_m = float(GEOMETRY_VALIDATION_SCENE_BBOX_TOLERANCE_M)
+    bbox_min_tolerant = scene_min - bbox_tolerance_m
+    bbox_max_tolerant = scene_max + bbox_tolerance_m
+    target_center = np.asarray(debug.get("target_center"), dtype=np.float64) if debug.get("target_center") is not None else None
+    target_bottom = np.asarray(debug.get("target_bottom_anchor"), dtype=np.float64) if debug.get("target_bottom_anchor") is not None else None
+    target_size = np.asarray(debug.get("target_sizes"), dtype=np.float64) if debug.get("target_sizes") is not None else None
+    fail_reasons: list[str] = []
+    if outside_ratio > float(outside_ratio_threshold):
+        fail_reasons.append("outside_scene_proxy")
+    if np.any(aligned_center < bbox_min_tolerant) or np.any(aligned_center > bbox_max_tolerant):
+        fail_reasons.append("outside_scene_proxy_center")
+    if np.any(aligned_bottom < bbox_min_tolerant) or np.any(aligned_bottom > bbox_max_tolerant):
+        fail_reasons.append("outside_scene_proxy_bottom")
+    nn_mean = float(nn_distances.mean()) if nn_distances.size else 0.0
+    if nn_mean > float(mean_nn_threshold_m):
+        fail_reasons.append("floating_from_scene_proxy")
+    target_center_error_m: float | None = None
+    target_bottom_error_m: float | None = None
+    target_size_delta: list[float] | None = None
+    metadata_threshold_m = float(GEOMETRY_VALIDATION_METADATA_ERROR_THRESHOLD_M)
+    metadata_contradiction = False
+    if target_center is not None:
+        target_center_error_m = float(np.linalg.norm(aligned_center - target_center))
+        metadata_contradiction = metadata_contradiction or target_center_error_m > metadata_threshold_m
+    if target_bottom is not None:
+        target_bottom_error_m = float(np.linalg.norm(aligned_bottom - target_bottom))
+        metadata_contradiction = metadata_contradiction or target_bottom_error_m > metadata_threshold_m
+    if target_size is not None:
+        target_size_delta = (aligned_size - target_size).tolist()
+        metadata_contradiction = metadata_contradiction or any(
+            abs(float(delta)) > metadata_threshold_m for delta in target_size_delta
+        )
+    if metadata_contradiction:
+        fail_reasons.append("metadata_contradiction")
+    payload = {
+        "scene_proxy_bbox": scene_bbox,
+        "actual_aligned_bbox": prior_bbox,
+        "outside_scene_proxy_ratio": outside_ratio,
+        "scene_proxy_mean_nn_distance_m": nn_mean,
+        "scene_proxy_median_nn_distance_m": float(np.median(nn_distances)) if nn_distances.size else 0.0,
+        "scene_proxy_p95_nn_distance_m": float(np.quantile(nn_distances, 0.95)) if nn_distances.size else 0.0,
+        "scene_proxy_p99_nn_distance_m": float(np.quantile(nn_distances, 0.99)) if nn_distances.size else 0.0,
+        "scene_proxy_frac_lt_0_05m": float((nn_distances < 0.05).mean()) if nn_distances.size else 0.0,
+        "scene_proxy_frac_lt_0_10m": float((nn_distances < 0.10).mean()) if nn_distances.size else 0.0,
+        "scene_proxy_frac_lt_0_20m": float((nn_distances < 0.20).mean()) if nn_distances.size else 0.0,
+        "thresholds": {
+            "outside_scene_proxy_ratio_threshold": float(outside_ratio_threshold),
+            "mean_nn_threshold_m": float(mean_nn_threshold_m),
+            "max_prior_points": int(max_prior_points),
+            "max_scene_points": int(max_scene_points),
+            "scene_bbox_tolerance_m": bbox_tolerance_m,
+            "metadata_error_threshold_m": metadata_threshold_m,
+        },
+        "passed": not fail_reasons,
+        "fail_reasons": fail_reasons,
+    }
+    if target_center_error_m is not None:
+        payload["target_center_error_m"] = target_center_error_m
+    if target_bottom_error_m is not None:
+        payload["target_bottom_error_m"] = target_bottom_error_m
+    if target_size_delta is not None:
+        payload["target_size_delta"] = target_size_delta
+    return payload
+
+
+def validate_resolved_prior_geometry(
+    prepared_init_plys: list[str],
+    prepared_init_formats: list[str],
+    selected_priors_metadata: list[dict[str, Any]],
+    scene_point_cloud,
+    *,
+    base_seed: int,
+    outside_ratio_threshold: float = GEOMETRY_VALIDATION_OUTSIDE_SCENE_PROXY_RATIO_THRESHOLD,
+    mean_nn_threshold_m: float = GEOMETRY_VALIDATION_MEAN_NN_THRESHOLD_M,
+    max_prior_points: int = GEOMETRY_VALIDATION_MAX_PRIOR_POINTS,
+    max_scene_points: int = GEOMETRY_VALIDATION_MAX_SCENE_POINTS,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    scene_xyz = np.asarray(scene_point_cloud.points, dtype=np.float64)
+    annotated: list[dict[str, Any]] = []
+    failures: list[str] = []
+    for init_path_value, init_format, metadata_item in zip(
+        prepared_init_plys,
+        prepared_init_formats,
+        selected_priors_metadata,
+    ):
+        prior_pcd = prepared_asset_to_point_cloud(Path(init_path_value), init_format)
+        prior_xyz = np.asarray(prior_pcd.points, dtype=np.float64)
+        updated_item = dict(metadata_item)
+        validation = validate_prior_geometry_against_scene_proxy(
+            prior_xyz,
+            scene_xyz,
+            updated_item,
+            outside_ratio_threshold=outside_ratio_threshold,
+            mean_nn_threshold_m=mean_nn_threshold_m,
+            max_prior_points=max_prior_points,
+            max_scene_points=max_scene_points,
+            seed=prior_sample_seed(updated_item, base_seed=base_seed),
+        )
+        updated_item["geometry_validation"] = validation
+        annotated.append(updated_item)
+        if not validation["passed"]:
+            failures.append(
+                f"{updated_item.get('prior_object_id')}->{updated_item.get('target_object_id')}: {', '.join(validation['fail_reasons'])}"
+            )
+    return annotated, failures
+
 
 def normalize_prior_protection_mode(value: str | None) -> str:
     normalized = str(value or "none").strip().lower()
@@ -150,6 +340,32 @@ def build_prior_protection_config(args: argparse.Namespace) -> dict[str, Any]:
         "lr_scale": float(np.clip(lr_scale, 0.0, 1.0)),
         "protect_from_prune": bool(getattr(args, "protect_prior_from_prune", True)),
         "protect_from_densify": bool(getattr(args, "protect_prior_from_densify", True)),
+    }
+
+
+def build_geometry_validation_policy(args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        "outside_scene_proxy_ratio_threshold": float(
+            getattr(
+                args,
+                "geometry_validation_outside_scene_proxy_ratio_threshold",
+                GEOMETRY_VALIDATION_OUTSIDE_SCENE_PROXY_RATIO_THRESHOLD,
+            )
+        ),
+        "mean_nn_threshold_m": float(
+            getattr(
+                args,
+                "geometry_validation_mean_nn_threshold_m",
+                GEOMETRY_VALIDATION_MEAN_NN_THRESHOLD_M,
+            )
+        ),
+        "max_prior_points": int(
+            getattr(args, "geometry_validation_max_prior_points", GEOMETRY_VALIDATION_MAX_PRIOR_POINTS)
+        ),
+        "max_scene_points": int(
+            getattr(args, "geometry_validation_max_scene_points", GEOMETRY_VALIDATION_MAX_SCENE_POINTS)
+        ),
+        "scene_proxy_mode": "base_scene_point_cloud",
     }
 
 
@@ -980,6 +1196,7 @@ def write_prior_metadata(
     sfm_region_replacement_mode: str = "none",
     sfm_removed_point_count: int | None = None,
     sfm_removed_point_ratio: float | None = None,
+    geometry_validation_policy: dict[str, Any] | None = None,
 ) -> None:
     metadata = {
         "selected_priors": selected_priors,
@@ -992,6 +1209,8 @@ def write_prior_metadata(
     }
     if prior_protection is not None:
         metadata["prior_protection"] = prior_protection
+    if geometry_validation_policy is not None:
+        metadata["geometry_validation_policy"] = geometry_validation_policy
     if len(selected_priors) == 1:
         item = selected_priors[0]
         metadata["source_prior"] = item.get("source_prior")
@@ -1125,6 +1344,38 @@ def propagate_prior_runtime_args(dataset: Any, args: argparse.Namespace) -> None
     )
     setattr(dataset, "sfm_region_margin_scale", float(getattr(args, "sfm_region_margin_scale", 1.05)))
     setattr(dataset, "sfm_region_margin_min_m", float(getattr(args, "sfm_region_margin_min_m", 0.02)))
+    setattr(
+        dataset,
+        "geometry_validation_outside_scene_proxy_ratio_threshold",
+        float(
+            getattr(
+                args,
+                "geometry_validation_outside_scene_proxy_ratio_threshold",
+                GEOMETRY_VALIDATION_OUTSIDE_SCENE_PROXY_RATIO_THRESHOLD,
+            )
+        ),
+    )
+    setattr(
+        dataset,
+        "geometry_validation_mean_nn_threshold_m",
+        float(
+            getattr(
+                args,
+                "geometry_validation_mean_nn_threshold_m",
+                GEOMETRY_VALIDATION_MEAN_NN_THRESHOLD_M,
+            )
+        ),
+    )
+    setattr(
+        dataset,
+        "geometry_validation_max_prior_points",
+        int(getattr(args, "geometry_validation_max_prior_points", GEOMETRY_VALIDATION_MAX_PRIOR_POINTS)),
+    )
+    setattr(
+        dataset,
+        "geometry_validation_max_scene_points",
+        int(getattr(args, "geometry_validation_max_scene_points", GEOMETRY_VALIDATION_MAX_SCENE_POINTS)),
+    )
     setattr(dataset, "protect_prior_from_prune", bool(getattr(args, "protect_prior_from_prune", True)))
     setattr(dataset, "protect_prior_from_densify", bool(getattr(args, "protect_prior_from_densify", True)))
 
@@ -1284,12 +1535,44 @@ def make_prior_init_scene():
                 )
                 sfm_region_margin_scale = float(getattr(args, "sfm_region_margin_scale", 1.05))
                 sfm_region_margin_min_m = float(getattr(args, "sfm_region_margin_min_m", 0.02))
+                geometry_validation_policy = build_geometry_validation_policy(args)
+                resolved_metadata_items = resolve_selected_prior_metadata_items(
+                    prepared_init_plys,
+                    prepared_init_formats,
+                    selected_priors_metadata,
+                )
+                validated_metadata_items, geometry_failures = validate_resolved_prior_geometry(
+                    prepared_init_plys,
+                    prepared_init_formats,
+                    resolved_metadata_items,
+                    scene_info.point_cloud,
+                    base_seed=prior_subsample_seed,
+                    outside_ratio_threshold=float(geometry_validation_policy["outside_scene_proxy_ratio_threshold"]),
+                    mean_nn_threshold_m=float(geometry_validation_policy["mean_nn_threshold_m"]),
+                    max_prior_points=int(geometry_validation_policy["max_prior_points"]),
+                    max_scene_points=int(geometry_validation_policy["max_scene_points"]),
+                )
+                if geometry_failures:
+                    write_prior_metadata(
+                        Path(self.model_path),
+                        selected_priors=validated_metadata_items,
+                        init_mode=init_mode,
+                        prior_protection=protection_config,
+                        prior_sh_reset_mode=prior_sh_reset_mode,
+                        prior_target_total_gaussians=prior_target_total_gaussians,
+                        sfm_region_replacement_mode=sfm_region_replacement_mode,
+                        geometry_validation_policy=geometry_validation_policy,
+                    )
+                    raise ValueError(
+                        "Prior geometry validation failed against scene proxy: "
+                        + "; ".join(geometry_failures)
+                    )
                 if init_mode == "replace":
                     if len(prepared_init_plys) != 1:
                         raise ValueError("replace init_mode supports exactly one prepared prior")
                     init_path = Path(prepared_init_plys[0])
                     prepared_asset_format = prepared_init_formats[0]
-                    current_selected_priors = [dict(item) for item in selected_priors_metadata]
+                    current_selected_priors = [dict(item) for item in validated_metadata_items]
                     if prepared_asset_format == "gaussian":
                         self.gaussians.load_ply(str(init_path), args.train_test_exp)
                         initialize_loaded_prior(self.gaussians, train_cam_infos, self.cameras_extent)
@@ -1317,6 +1600,7 @@ def make_prior_init_scene():
                         prior_sh_reset_mode=prior_sh_reset_mode,
                         prior_target_total_gaussians=prior_target_total_gaussians,
                         sfm_region_replacement_mode=sfm_region_replacement_mode,
+                        geometry_validation_policy=geometry_validation_policy,
                     )
                 elif init_mode in {"merge", "weighted_merge", "filtered_merge"}:
                     merged_pcd = scene_info.point_cloud
@@ -1328,14 +1612,9 @@ def make_prior_init_scene():
                     gaussian_original_counts: list[int] = []
                     gaussian_raw_entries: list[tuple[np.ndarray, dict[str, Any]]] = []
                     updated_selected_priors: list[dict[str, Any]] = []
-                    resolved_metadata_items = resolve_selected_prior_metadata_items(
-                        prepared_init_plys,
-                        prepared_init_formats,
-                        selected_priors_metadata,
-                    )
                     for (init_path_value, init_format), metadata_item in zip(
                         zip(prepared_init_plys, prepared_init_formats),
-                        resolved_metadata_items,
+                        validated_metadata_items,
                     ):
                         if init_format == "gaussian":
                             gaussian_vertex = np.array(
@@ -1439,6 +1718,7 @@ def make_prior_init_scene():
                             sfm_region_replacement_mode=sfm_region_replacement_mode,
                             sfm_removed_point_count=sfm_removed_point_count,
                             sfm_removed_point_ratio=sfm_removed_point_ratio,
+                            geometry_validation_policy=geometry_validation_policy,
                         )
                 else:
                     raise ValueError(f"Unsupported init_mode: {init_mode}")
@@ -1493,6 +1773,10 @@ def write_render_compatible_cfg_args(model_path: Path, args: argparse.Namespace)
         "camera_order_seed",
         "camera_shuffle_enabled",
         "deterministic",
+        "geometry_validation_outside_scene_proxy_ratio_threshold",
+        "geometry_validation_mean_nn_threshold_m",
+        "geometry_validation_max_prior_points",
+        "geometry_validation_max_scene_points",
         "eval",
         "convert_SHs_python",
         "compute_cov3D_python",
@@ -1565,6 +1849,26 @@ def build_parser() -> tuple[argparse.ArgumentParser, Any, Any, Any]:
     )
     parser.add_argument("--sfm-region-margin-scale", type=float, default=1.05)
     parser.add_argument("--sfm-region-margin-min-m", type=float, default=0.02)
+    parser.add_argument(
+        "--geometry-validation-outside-scene-proxy-ratio-threshold",
+        type=float,
+        default=GEOMETRY_VALIDATION_OUTSIDE_SCENE_PROXY_RATIO_THRESHOLD,
+    )
+    parser.add_argument(
+        "--geometry-validation-mean-nn-threshold-m",
+        type=float,
+        default=GEOMETRY_VALIDATION_MEAN_NN_THRESHOLD_M,
+    )
+    parser.add_argument(
+        "--geometry-validation-max-prior-points",
+        type=int,
+        default=GEOMETRY_VALIDATION_MAX_PRIOR_POINTS,
+    )
+    parser.add_argument(
+        "--geometry-validation-max-scene-points",
+        type=int,
+        default=GEOMETRY_VALIDATION_MAX_SCENE_POINTS,
+    )
     parser.add_argument("--protect-prior-from-prune", action="store_true", default=True)
     parser.add_argument("--no-protect-prior-from-prune", dest="protect_prior_from_prune", action="store_false")
     parser.add_argument("--protect-prior-from-densify", action="store_true", default=True)
@@ -1582,6 +1886,7 @@ def main() -> int:
     args.camera_shuffle_enabled = determinism["camera_shuffle_enabled"]
     args.deterministic = determinism["deterministic"]
     apply_determinism_settings(seed=args.seed, deterministic=args.deterministic)
+    geometry_validation_policy = build_geometry_validation_policy(args)
 
     prepared_init_ply = None
     prepared_asset_format = None
@@ -1603,6 +1908,7 @@ def main() -> int:
             prior_sh_reset_mode=args.prior_sh_reset_mode,
             prior_target_total_gaussians=args.prior_target_total_gaussians,
             sfm_region_replacement_mode=args.sfm_region_replacement_mode,
+            geometry_validation_policy=geometry_validation_policy,
         )
     elif args.prior_ply is not None:
         args.prior_ply = args.prior_ply.resolve()
@@ -1636,6 +1942,7 @@ def main() -> int:
             prior_sh_reset_mode=args.prior_sh_reset_mode,
             prior_target_total_gaussians=args.prior_target_total_gaussians,
             sfm_region_replacement_mode=args.sfm_region_replacement_mode,
+            geometry_validation_policy=geometry_validation_policy,
         )
 
     args.save_iterations.append(args.iterations)

@@ -5,6 +5,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import numpy as np
 import torch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -144,6 +145,10 @@ def test_build_train_command_with_prior_spec_json(tmp_path: Path) -> None:
         sfm_region_replacement_mode="aligned_prior_aabb_union",
         sfm_region_margin_scale=1.1,
         sfm_region_margin_min_m=0.05,
+        geometry_validation_outside_scene_proxy_ratio_threshold=0.02,
+        geometry_validation_mean_nn_threshold_m=0.25,
+        geometry_validation_max_prior_points=1024,
+        geometry_validation_max_scene_points=4096,
         protect_prior_from_prune=True,
         protect_prior_from_densify=False,
         save_initial_snapshot=True,
@@ -179,6 +184,14 @@ def test_build_train_command_with_prior_spec_json(tmp_path: Path) -> None:
     assert "1.1" in command
     assert "--sfm-region-margin-min-m" in command
     assert "0.05" in command
+    assert "--geometry-validation-outside-scene-proxy-ratio-threshold" in command
+    assert "0.02" in command
+    assert "--geometry-validation-mean-nn-threshold-m" in command
+    assert "0.25" in command
+    assert "--geometry-validation-max-prior-points" in command
+    assert "1024" in command
+    assert "--geometry-validation-max-scene-points" in command
+    assert "4096" in command
     assert "--protect-prior-from-prune" in command
     assert "--no-protect-prior-from-densify" in command
     assert "--save-initial-snapshot" in command
@@ -206,6 +219,10 @@ def test_backend_config_from_payload_parses_artifacts(tmp_path: Path) -> None:
             "sfm_region_replacement_mode": "aligned_prior_aabb_union",
             "sfm_region_margin_scale": 1.2,
             "sfm_region_margin_min_m": 0.03,
+            "geometry_validation_outside_scene_proxy_ratio_threshold": 0.015,
+            "geometry_validation_mean_nn_threshold_m": 0.35,
+            "geometry_validation_max_prior_points": 4096,
+            "geometry_validation_max_scene_points": 16384,
             "protect_prior_from_prune": False,
             "protect_prior_from_densify": True,
             "seed": 13,
@@ -232,6 +249,10 @@ def test_backend_config_from_payload_parses_artifacts(tmp_path: Path) -> None:
     assert config.sfm_region_replacement_mode == "aligned_prior_aabb_union"
     assert config.sfm_region_margin_scale == 1.2
     assert config.sfm_region_margin_min_m == 0.03
+    assert config.geometry_validation_outside_scene_proxy_ratio_threshold == 0.015
+    assert config.geometry_validation_mean_nn_threshold_m == 0.35
+    assert config.geometry_validation_max_prior_points == 4096
+    assert config.geometry_validation_max_scene_points == 16384
     assert config.protect_prior_from_prune is False
     assert config.protect_prior_from_densify is True
     assert config.seed == 13
@@ -266,6 +287,10 @@ def test_propagate_prior_runtime_args_copies_diagnostic_controls(tmp_path: Path)
         sfm_region_replacement_mode="aligned_prior_aabb_union",
         sfm_region_margin_scale=1.1,
         sfm_region_margin_min_m=0.05,
+        geometry_validation_outside_scene_proxy_ratio_threshold=0.0125,
+        geometry_validation_mean_nn_threshold_m=0.45,
+        geometry_validation_max_prior_points=2048,
+        geometry_validation_max_scene_points=8192,
         protect_prior_from_prune=True,
         protect_prior_from_densify=False,
     )
@@ -284,6 +309,10 @@ def test_propagate_prior_runtime_args_copies_diagnostic_controls(tmp_path: Path)
     assert dataset.sfm_region_replacement_mode == "aligned_prior_aabb_union"
     assert dataset.sfm_region_margin_scale == 1.1
     assert dataset.sfm_region_margin_min_m == 0.05
+    assert dataset.geometry_validation_outside_scene_proxy_ratio_threshold == 0.0125
+    assert dataset.geometry_validation_mean_nn_threshold_m == 0.45
+    assert dataset.geometry_validation_max_prior_points == 2048
+    assert dataset.geometry_validation_max_scene_points == 8192
     assert dataset.protect_prior_from_prune is True
     assert dataset.protect_prior_from_densify is False
 
@@ -408,3 +437,201 @@ def test_build_prior_group_summaries_tracks_survival_by_object(tmp_path: Path) -
     assert summaries[1]["inserted_point_count"] == 2
     assert summaries[1]["survived_point_count"] == 1
     assert summaries[1]["survival_ratio"] == 0.5
+
+
+def test_validate_prior_geometry_against_scene_proxy_flags_floating_and_outside(tmp_path: Path) -> None:
+    backend_module = _load_backend_module(tmp_path / "fake_repo")
+
+    scene_xyz = np.asarray(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.5, 0.5, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    prior_xyz = scene_xyz + np.asarray([0.0, 3.0, 0.0], dtype=np.float64)
+    metadata_item = {
+        "prior_object_id": "lamp_1",
+        "target_object_id": 6,
+        "alignment_debug": {
+            "target_center": [0.5, 0.5, 0.5],
+            "target_bottom_anchor": [0.5, 0.5, 0.0],
+            "target_sizes": [1.0, 1.0, 1.0],
+        },
+    }
+
+    validation = backend_module.validate_prior_geometry_against_scene_proxy(
+        prior_xyz,
+        scene_xyz,
+        metadata_item,
+        outside_ratio_threshold=0.01,
+        mean_nn_threshold_m=0.5,
+        max_prior_points=32,
+        max_scene_points=32,
+        seed=0,
+    )
+
+    assert validation["passed"] is False
+    assert "outside_scene_proxy" in validation["fail_reasons"]
+    assert "floating_from_scene_proxy" in validation["fail_reasons"]
+    assert validation["outside_scene_proxy_ratio"] == 1.0
+    assert validation["scene_proxy_mean_nn_distance_m"] > 2.0
+
+
+def test_validate_prior_geometry_against_scene_proxy_accepts_nearby_prior(tmp_path: Path) -> None:
+    backend_module = _load_backend_module(tmp_path / "fake_repo")
+
+    scene_xyz = np.asarray(
+        [
+            [0.0, 0.0, 0.0],
+            [2.0, 0.0, 0.0],
+            [0.0, 2.0, 0.0],
+            [2.0, 2.0, 0.0],
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, 2.0],
+            [0.9, 0.9, 0.0],
+            [1.1, 0.9, 0.0],
+            [0.9, 1.1, 0.5],
+            [1.1, 1.1, 0.5],
+        ],
+        dtype=np.float64,
+    )
+    prior_xyz = np.asarray(
+        [
+            [0.9, 0.9, 0.0],
+            [1.1, 0.9, 0.0],
+            [0.9, 1.1, 0.5],
+            [1.1, 1.1, 0.5],
+        ],
+        dtype=np.float64,
+    )
+    metadata_item = {
+        "prior_object_id": "chair_1",
+        "target_object_id": 74,
+        "alignment_debug": {
+            "target_center": [1.0, 1.0, 0.25],
+            "target_bottom_anchor": [1.0, 1.0, 0.0],
+            "target_sizes": [0.2, 0.2, 0.5],
+        },
+    }
+
+    validation = backend_module.validate_prior_geometry_against_scene_proxy(
+        prior_xyz,
+        scene_xyz,
+        metadata_item,
+        outside_ratio_threshold=0.01,
+        mean_nn_threshold_m=0.5,
+        max_prior_points=32,
+        max_scene_points=32,
+        seed=7,
+    )
+
+    assert validation["passed"] is True
+    assert validation["fail_reasons"] == []
+    assert validation["outside_scene_proxy_ratio"] == 0.0
+    assert validation["scene_proxy_mean_nn_distance_m"] < 0.5
+    assert validation["target_center_error_m"] < 0.3
+
+
+def test_validate_prior_geometry_against_scene_proxy_flags_center_outside_with_low_outside_ratio(
+    tmp_path: Path,
+) -> None:
+    backend_module = _load_backend_module(tmp_path / "fake_repo")
+
+    scene_xyz = np.asarray(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [1.0, 1.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    mostly_inside = np.tile(np.asarray([[0.9, 0.5, 0.2]], dtype=np.float64), (100, 1))
+    prior_xyz = np.concatenate(
+        [
+            mostly_inside,
+            np.asarray([[1.2, 0.5, 0.2]], dtype=np.float64),
+        ],
+        axis=0,
+    )
+    metadata_item = {
+        "alignment_debug": {
+            "target_center": [1.05, 0.5, 0.2],
+            "target_bottom_anchor": [1.05, 0.5, 0.2],
+            "target_sizes": [0.3, 0.0, 0.0],
+        }
+    }
+
+    validation = backend_module.validate_prior_geometry_against_scene_proxy(
+        prior_xyz,
+        scene_xyz,
+        metadata_item,
+        outside_ratio_threshold=0.01,
+        mean_nn_threshold_m=0.5,
+        max_prior_points=128,
+        max_scene_points=128,
+        seed=3,
+    )
+
+    assert validation["outside_scene_proxy_ratio"] < 0.01
+    assert "outside_scene_proxy" not in validation["fail_reasons"]
+    assert "outside_scene_proxy_center" in validation["fail_reasons"]
+    assert "outside_scene_proxy_bottom" in validation["fail_reasons"]
+
+
+def test_validate_prior_geometry_against_scene_proxy_flags_metadata_contradiction(tmp_path: Path) -> None:
+    backend_module = _load_backend_module(tmp_path / "fake_repo")
+
+    scene_xyz = np.asarray(
+        [
+            [0.0, 0.0, 0.0],
+            [2.0, 0.0, 0.0],
+            [0.0, 2.0, 0.0],
+            [2.0, 2.0, 0.0],
+            [1.0, 1.0, 2.0],
+            [0.9, 0.9, 0.0],
+            [1.1, 0.9, 0.0],
+            [0.9, 1.1, 0.4],
+            [1.1, 1.1, 0.4],
+        ],
+        dtype=np.float64,
+    )
+    prior_xyz = np.asarray(
+        [
+            [0.9, 0.9, 0.0],
+            [1.1, 0.9, 0.0],
+            [0.9, 1.1, 0.4],
+            [1.1, 1.1, 0.4],
+        ],
+        dtype=np.float64,
+    )
+    metadata_item = {
+        "alignment_debug": {
+            "target_center": [1.3, 1.3, 0.4],
+            "target_bottom_anchor": [1.3, 1.3, 0.1],
+            "target_sizes": [0.5, 0.5, 0.7],
+        }
+    }
+
+    validation = backend_module.validate_prior_geometry_against_scene_proxy(
+        prior_xyz,
+        scene_xyz,
+        metadata_item,
+        outside_ratio_threshold=0.05,
+        mean_nn_threshold_m=0.5,
+        max_prior_points=64,
+        max_scene_points=64,
+        seed=11,
+    )
+
+    assert validation["passed"] is False
+    assert validation["fail_reasons"] == ["metadata_contradiction"]
+    assert validation["target_center_error_m"] > 0.05
+    assert validation["target_bottom_error_m"] > 0.05
+    assert any(abs(delta) > 0.05 for delta in validation["target_size_delta"])

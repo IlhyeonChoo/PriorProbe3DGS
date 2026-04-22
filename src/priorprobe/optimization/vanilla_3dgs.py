@@ -55,6 +55,10 @@ class Vanilla3DGSBackendConfig:
     sfm_region_replacement_mode: str = "none"
     sfm_region_margin_scale: float = 1.05
     sfm_region_margin_min_m: float = 0.02
+    geometry_validation_outside_scene_proxy_ratio_threshold: float = 0.01
+    geometry_validation_mean_nn_threshold_m: float = 0.5
+    geometry_validation_max_prior_points: int = 2048
+    geometry_validation_max_scene_points: int = 8192
     save_initial_snapshot: bool = False
     initial_render_sets: tuple[str, ...] = ()
     seed: int = 42
@@ -133,6 +137,18 @@ class Vanilla3DGSBackendConfig:
             sfm_region_replacement_mode=str(payload.get("sfm_region_replacement_mode", "none")),
             sfm_region_margin_scale=float(payload.get("sfm_region_margin_scale", 1.05)),
             sfm_region_margin_min_m=float(payload.get("sfm_region_margin_min_m", 0.02)),
+            geometry_validation_outside_scene_proxy_ratio_threshold=float(
+                payload.get("geometry_validation_outside_scene_proxy_ratio_threshold", 0.01)
+            ),
+            geometry_validation_mean_nn_threshold_m=float(
+                payload.get("geometry_validation_mean_nn_threshold_m", 0.5)
+            ),
+            geometry_validation_max_prior_points=int(
+                payload.get("geometry_validation_max_prior_points", 2048)
+            ),
+            geometry_validation_max_scene_points=int(
+                payload.get("geometry_validation_max_scene_points", 8192)
+            ),
             save_initial_snapshot=bool(artifacts_payload.get("save_initial_snapshot", False)),
             initial_render_sets=_as_str_tuple(artifacts_payload.get("initial_render_sets")),
             seed=int(payload.get("seed", 42)),
@@ -229,6 +245,22 @@ def build_train_command(
         command.extend(["--sfm-region-replacement-mode", config.sfm_region_replacement_mode])
         command.extend(["--sfm-region-margin-scale", str(config.sfm_region_margin_scale)])
         command.extend(["--sfm-region-margin-min-m", str(config.sfm_region_margin_min_m)])
+        command.extend([
+            "--geometry-validation-outside-scene-proxy-ratio-threshold",
+            str(config.geometry_validation_outside_scene_proxy_ratio_threshold),
+        ])
+        command.extend([
+            "--geometry-validation-mean-nn-threshold-m",
+            str(config.geometry_validation_mean_nn_threshold_m),
+        ])
+        command.extend([
+            "--geometry-validation-max-prior-points",
+            str(config.geometry_validation_max_prior_points),
+        ])
+        command.extend([
+            "--geometry-validation-max-scene-points",
+            str(config.geometry_validation_max_scene_points),
+        ])
         command.append(
             "--protect-prior-from-prune"
             if config.protect_prior_from_prune
