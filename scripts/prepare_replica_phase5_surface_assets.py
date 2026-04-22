@@ -39,6 +39,16 @@ from priorprobe.replica_surface import (
 from priorprobe.runtime_paths import to_repo_relative_path
 
 
+SHARED_PHASE5_OUTPUT_DEFAULTS = {
+    "dataset-config-out": Path("configs/datasets/replica_multi_roomwide_v2_384_surface_rgb_shared.yaml"),
+    "manifest-out": Path("outputs/gaussian_direct/prior_library/replica_target_surface_exact_trained_clip_manifest.json"),
+    "config-out": Path("outputs/gaussian_direct/prior_library/replica_target_surface_exact_trained_clip.yaml"),
+    "inventory-out": Path("outputs/gaussian_direct/prior_library/replica_target_surface_exact_trained_clip_inventory.json"),
+    "report-out": Path("docs/notes/03-23_phase5_surface_prep_2026.md"),
+    "prior-stage-root": Path("outputs/gaussian_direct/prior_library/replica_target_surface_exact_trained_clip"),
+}
+
+
 def resolve_path(path_value: Path) -> Path:
     return path_value if path_value.is_absolute() else ROOT / path_value
 
@@ -335,10 +345,45 @@ def phase5_anchor_mode_for_category(category: str) -> str:
     return "floor" if str(category) in {"chair", "sofa", "table", "lamp"} else "center"
 
 
+def shared_phase5_output_defaults() -> dict[str, Path]:
+    return {flag: resolve_path(path).resolve() for flag, path in SHARED_PHASE5_OUTPUT_DEFAULTS.items()}
+
+
+def is_partial_phase5_run(
+    *,
+    requested_scene_ids: list[str] | None,
+    available_scene_ids: list[str],
+    requested_object_ids: set[int],
+) -> bool:
+    if requested_object_ids:
+        return True
+    if requested_scene_ids is None:
+        return False
+    return sorted(requested_scene_ids) != sorted(available_scene_ids)
+
+
+def validate_phase5_output_paths(*, is_partial_run: bool, output_paths: dict[str, Path]) -> None:
+    if not is_partial_run:
+        return
+    shared_defaults = shared_phase5_output_defaults()
+    blocked_flags = [
+        flag
+        for flag, output_path in output_paths.items()
+        if output_path.resolve() == shared_defaults[flag]
+    ]
+    if blocked_flags:
+        joined = ", ".join(f"--{flag}" for flag in blocked_flags)
+        raise ValueError(
+            "Partial Phase 5 runs must not reuse shared default outputs. "
+            f"Provide custom paths for: {joined}"
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Prepare Phase 5 surface-rendered Replica scene datasets and learned same-scene priors.")
     parser.add_argument("--reference-dataset-config", default=Path("configs/datasets/replica_multi_roomwide_v2_384_shared.yaml"), type=Path)
     parser.add_argument("--scene-id", action="append", dest="scene_ids")
+    parser.add_argument("--target-object-id", action="append", dest="target_object_ids", type=int)
     parser.add_argument("--raw-root", default=Path("/mnt/hddg1/3dgs-data/priorprobe3dgs/replica_dataset/raw"), type=Path)
     parser.add_argument("--scene-output-root", default=Path("/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi_roomwide_v2_384_surface_rgb"), type=Path)
     parser.add_argument("--dataset-config-out", default=Path("configs/datasets/replica_multi_roomwide_v2_384_surface_rgb_shared.yaml"), type=Path)
@@ -377,6 +422,23 @@ def main() -> int:
     scene_records: list[dict[str, Any]] = []
     object_records: list[dict[str, Any]] = []
     prior_default_objects: list[dict[str, Any]] = []
+    requested_object_ids = {int(value) for value in (args.target_object_ids or [])}
+    partial_run = is_partial_phase5_run(
+        requested_scene_ids=list(args.scene_ids) if args.scene_ids is not None else None,
+        available_scene_ids=list(spec.scenes.keys()),
+        requested_object_ids=requested_object_ids,
+    )
+    validate_phase5_output_paths(
+        is_partial_run=partial_run,
+        output_paths={
+            "dataset-config-out": dataset_config_out,
+            "manifest-out": manifest_out,
+            "config-out": config_out,
+            "inventory-out": inventory_out,
+            "report-out": report_out,
+            "prior-stage-root": prior_stage_root,
+        },
+    )
 
     repo_path = (ROOT / "../3DGS/gaussian-splatting").resolve()
     python_executable = repo_path / "venv" / "bin" / "python"
@@ -398,6 +460,8 @@ def main() -> int:
         target_payloads = load_targets_from_scene(dataset_scene.source_path)
         for target_index, target_payload in enumerate(target_payloads):
             object_id = int(target_payload["object_id"])
+            if requested_object_ids and object_id not in requested_object_ids:
+                continue
             object_scene_root = object_dataset_root / scene_id / str(object_id)
             object_record = export_object_surface_dataset(
                 raw_scene_root=raw_scene_root,

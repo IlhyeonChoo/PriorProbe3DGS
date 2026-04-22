@@ -273,7 +273,13 @@ class ReplicaEGLRenderer:
             bg_color=np.asarray(background_rgba, dtype=np.float32),
             ambient_light=np.asarray(ambient_light, dtype=np.float32),
         )
-        self.scene.add(pyrender.Mesh.from_trimesh(trimesh_mesh, smooth=False))
+        pr_mesh = pyrender.Mesh.from_trimesh(trimesh_mesh, smooth=False)
+        for primitive in pr_mesh.primitives:
+            if primitive.material is not None:
+                primitive.material.doubleSided = True
+            else:
+                primitive.material = pyrender.MetallicRoughnessMaterial(doubleSided=True)
+        self.scene.add(pr_mesh)
         self.camera_node = self.scene.add(
             pyrender.IntrinsicsCamera(
                 fx=float(fx),

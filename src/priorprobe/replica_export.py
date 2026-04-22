@@ -75,6 +75,34 @@ def select_top_targets(
     payload = load_replica_semantic_info(scene_root)
     scene_id = scene_root.name
     allowed_categories = {str(category) for category in categories}
+    room_mins, room_maxs, _ = compute_room_bounds(scene_root)
+    room_tolerance_m = 0.02
+
+    def oriented_bbox_corners(*, center: np.ndarray, sizes: np.ndarray, rotation_xyzw: np.ndarray) -> np.ndarray:
+        rotation_matrix = quaternion_xyzw_to_rotation_matrix(rotation_xyzw).astype(np.float64)
+        half_sizes = sizes.astype(np.float64) * 0.5
+        corner_signs = np.asarray(
+            [
+                [-1.0, -1.0, -1.0],
+                [-1.0, -1.0, 1.0],
+                [-1.0, 1.0, -1.0],
+                [-1.0, 1.0, 1.0],
+                [1.0, -1.0, -1.0],
+                [1.0, -1.0, 1.0],
+                [1.0, 1.0, -1.0],
+                [1.0, 1.0, 1.0],
+            ],
+            dtype=np.float64,
+        )
+        local_offsets = corner_signs * half_sizes[None, :]
+        return center.astype(np.float64)[None, :] + local_offsets @ rotation_matrix.T
+
+    def room_contains_oriented_bbox(*, center: np.ndarray, sizes: np.ndarray, rotation_xyzw: np.ndarray) -> bool:
+        corners = oriented_bbox_corners(center=center, sizes=sizes, rotation_xyzw=rotation_xyzw)
+        mins = room_mins.astype(np.float64) - room_tolerance_m
+        maxs = room_maxs.astype(np.float64) + room_tolerance_m
+        return bool(np.all(corners >= mins[None, :]) and np.all(corners <= maxs[None, :]))
+
     candidates: list[ReplicaOracleTarget] = []
     for item in payload.get("objects", []):
         category = str(item.get("class_name"))
@@ -84,6 +112,8 @@ def select_top_targets(
         sizes = np.asarray(bbox["sizes"], dtype=np.float32)
         center = np.asarray(bbox["center"], dtype=np.float32)
         rotation = np.asarray(item["oriented_bbox"]["orientation"]["rotation"], dtype=np.float32)
+        if not room_contains_oriented_bbox(center=center, sizes=sizes, rotation_xyzw=rotation):
+            continue
         candidates.append(
             ReplicaOracleTarget(
                 scene_id=scene_id,

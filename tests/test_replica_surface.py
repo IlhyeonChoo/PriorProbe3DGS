@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import yaml
 from pathlib import Path
 
 import numpy as np
@@ -13,6 +14,9 @@ from priorprobe.replica_surface import (
     load_colmap_text_frames,
     opencv_cam2world_to_opengl_pose,
 )
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_colmap_pose_to_world_identity_rotation() -> None:
@@ -90,6 +94,19 @@ def test_build_surface_dataset_config_payload_includes_surface_scene_type(tmp_pa
         "office_0": {"relative_path": "office_0"},
     }
     assert any("vertex-colored mesh" in note for note in dataset["notes"])
+
+
+def test_shared_surface_dataset_yaml_matches_generated_payload() -> None:
+    config_path = ROOT / "configs" / "datasets" / "replica_multi_roomwide_v2_384_surface_rgb_shared.yaml"
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    dataset = payload["dataset"]
+
+    generated = build_surface_dataset_config_payload(
+        root=Path(str(dataset["root"])),
+        scene_ids=list(dataset["scenes"].keys()),
+    )
+
+    assert payload == generated
 
 
 def test_canonicalize_gaussian_asset_to_seed_frame_matches_floor_seed_inverse(tmp_path: Path) -> None:
