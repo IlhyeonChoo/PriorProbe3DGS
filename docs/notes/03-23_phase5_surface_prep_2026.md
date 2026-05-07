@@ -1,32 +1,18 @@
 # Replica Phase 5 Surface Prep
 
-## External Roots
-
-- `DATA_STAGE_ROOT=/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs`
-- `SURFACE_SCENE_DATASET_ROOT=${DATA_STAGE_ROOT}/replica_colmap_multi_roomwide_v2_384_surface_rgb`
-- `SURFACE_OBJECT_DATASET_ROOT=${DATA_STAGE_ROOT}/replica_object_surface_exact_rgb`
-
 ## Summary
 
-- Scene dataset root: `${SURFACE_SCENE_DATASET_ROOT}`
-- Scene dataset config: `../../configs/datasets/replica_multi_roomwide_v2_384_surface_rgb_shared.yaml`
-- Prior object dataset root: `${SURFACE_OBJECT_DATASET_ROOT}`
-- Prior training root: `../../outputs/gaussian_direct/prior_training/replica_surface_exact_trained_7000`
-- Prior manifest: `../../outputs/gaussian_direct/prior_library/replica_target_surface_exact_trained_clip_manifest.json`
-- Prior config: `../../outputs/gaussian_direct/prior_library/replica_target_surface_exact_trained_clip.yaml`
+- Scene dataset root: `/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi_roomwide_v2_384_surface_rgb`
+- Scene dataset config: `/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/configs/datasets/replica_multi_roomwide_v2_384_surface_rgb_shared.yaml`
+- Prior object dataset root: `/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_object_surface_exact_rgb_roomcontained_hq192_v2`
+- Prior training root: `/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_training/04-05-surface-trained-roomcontained-hq192-15k-v2-2026`
+- Prior manifest: `/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/04-05-target-surface-roomcontained-hq192-15k-v2-manifest-2026.json`
+- Prior config: `/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_library/04-05-target-surface-roomcontained-hq192-15k-v2-2026.yaml`
 
 ## Scenes
 
 - `room_0`: 384 frames, 4 targets, renderer `pyrender_egl_vertex_color`
-- `office_0`: 384 frames, 4 targets, renderer `pyrender_egl_vertex_color`
 
 ## Object Priors
 
-- `${SURFACE_OBJECT_DATASET_ROOT}/room_0/6`: object `6` `lamp`, views 96, trained prior `../../outputs/gaussian_direct/prior_training/replica_surface_exact_trained_7000/room_0/6/point_cloud/iteration_7000/point_cloud.ply`
-- `${SURFACE_OBJECT_DATASET_ROOT}/room_0/9`: object `9` `sofa`, views 96, trained prior `../../outputs/gaussian_direct/prior_training/replica_surface_exact_trained_7000/room_0/9/point_cloud/iteration_7000/point_cloud.ply`
-- `${SURFACE_OBJECT_DATASET_ROOT}/room_0/77`: object `77` `sofa`, views 96, trained prior `../../outputs/gaussian_direct/prior_training/replica_surface_exact_trained_7000/room_0/77/point_cloud/iteration_7000/point_cloud.ply`
-- `${SURFACE_OBJECT_DATASET_ROOT}/room_0/74`: object `74` `chair`, views 96, trained prior `../../outputs/gaussian_direct/prior_training/replica_surface_exact_trained_7000/room_0/74/point_cloud/iteration_7000/point_cloud.ply`
-- `${SURFACE_OBJECT_DATASET_ROOT}/office_0/9`: object `9` `sofa`, views 96, trained prior `../../outputs/gaussian_direct/prior_training/replica_surface_exact_trained_7000/office_0/9/point_cloud/iteration_7000/point_cloud.ply`
-- `${SURFACE_OBJECT_DATASET_ROOT}/office_0/7`: object `7` `sofa`, views 96, trained prior `../../outputs/gaussian_direct/prior_training/replica_surface_exact_trained_7000/office_0/7/point_cloud/iteration_7000/point_cloud.ply`
-- `${SURFACE_OBJECT_DATASET_ROOT}/office_0/58`: object `58` `table`, views 96, trained prior `../../outputs/gaussian_direct/prior_training/replica_surface_exact_trained_7000/office_0/58/point_cloud/iteration_7000/point_cloud.ply`
-- `${SURFACE_OBJECT_DATASET_ROOT}/office_0/61`: object `61` `chair`, views 96, trained prior `../../outputs/gaussian_direct/prior_training/replica_surface_exact_trained_7000/office_0/61/point_cloud/iteration_7000/point_cloud.ply`
+- `/mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_object_surface_exact_rgb_roomcontained_hq192_v2/room_0/77`: object `77` `sofa`, views 192, trained prior `/home/ilhyeonchu/ReCompose3D/PriorProbe3DGS-gaussian/outputs/gaussian_direct/prior_training/04-05-surface-trained-roomcontained-hq192-15k-v2-2026/room_0/77/point_cloud/iteration_15000/point_cloud.ply`

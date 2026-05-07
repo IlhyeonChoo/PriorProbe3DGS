@@ -48,8 +48,11 @@ venv/
 /outputs/**/backend_runs/
 /outputs/**/experiments/
 /outputs/**/prior_library/
+/outputs/**/prior_training/
 /outputs/**/legacy_misc/
 /outputs/**/inspection/
+/outputs/**/reports/*/
+/outputs/tmp/
 /outputs/**/._*
 
 # Logs
@@ -59,6 +62,7 @@ venv/
 
 # Local assistant and staging scratch files
 /CLAUDE.md*
+._*
 #/AGENTS.md*
 /docs/git_staging_guide*.md
 *.txt
