@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from priorprobe.experiment_storage import experiment_storage_dir
+
 
 @dataclass(slots=True)
 class TrainingRun:
@@ -104,7 +106,7 @@ class PriorProbeTrainer:
         )
 
     def save_run(self, run: TrainingRun) -> Path:
-        run_dir = self.output_root / "experiments" / run.experiment_name
+        run_dir = experiment_storage_dir(self.output_root, "experiments", run.experiment_name)
         run_dir.mkdir(parents=True, exist_ok=True)
         output_path = run_dir / "run_summary.json"
         output_path.write_text(json.dumps(run.to_dict(), indent=2), encoding="utf-8")

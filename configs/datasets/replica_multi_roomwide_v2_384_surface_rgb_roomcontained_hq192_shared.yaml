@@ -1,0 +1,24 @@
+dataset:
+  name: replica
+  phase: A
+  root: /mnt/3dgs-ssd/3dgs-stage/priorprobe3dgs/replica_colmap_multi_roomwide_v2_384_surface_rgb_roomcontained_hq192
+  format: colmap
+  default_scene_id: room_0
+  source_path_template: '{root}/{scene_id}'
+  images: images
+  depths: ''
+  eval: true
+  white_background: false
+  scene_type: controlled_indoor_multi_object_surface_rgb
+  object_count_range:
+  - 2
+  - 4
+  notes:
+  - Replica multi-object roomwide v2 scenes rerendered from raw vertex-colored mesh
+    with EGL offscreen rendering.
+  - Camera poses and sparse points are reused from the GT-staged roomwide_v2_384 dataset.
+  - Oracle target metadata is copied from the reference dataset; oracle crops are
+    object-only surface renders.
+  scenes:
+    room_0:
+      relative_path: room_0

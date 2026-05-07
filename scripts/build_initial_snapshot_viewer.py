@@ -65,6 +65,27 @@ def load_json(path: Path) -> dict | list:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def resolve_aligned_prior_path(path_value: str | Path, backend_run_dir: Path) -> Path:
+    aligned_path = Path(path_value)
+    if aligned_path.exists():
+        return aligned_path
+    fallback = backend_run_dir / "prior_init" / aligned_path.name
+    if fallback.exists():
+        return fallback
+    return aligned_path
+
+
+def normalize_prior_entries(prior_entries: list[dict], backend_run_dir: Path) -> list[dict]:
+    normalized_entries: list[dict] = []
+    for entry in prior_entries:
+        normalized_entry = dict(entry)
+        normalized_entry["aligned_prior"] = str(
+            resolve_aligned_prior_path(entry["aligned_prior"], backend_run_dir).resolve()
+        )
+        normalized_entries.append(normalized_entry)
+    return normalized_entries
+
+
 def list_pngs(path: Path) -> list[Path]:
     return sorted(candidate for candidate in path.glob("*.png") if candidate.is_file())
 
@@ -423,6 +444,7 @@ def main() -> int:
     results = load_json(backend_run_dir / "results.json")
     prior_metadata_path = backend_run_dir / "prior_init" / "metadata.json"
     prior_entries = load_json(prior_metadata_path)["selected_priors"] if prior_metadata_path.exists() else []
+    prior_entries = normalize_prior_entries(prior_entries, backend_run_dir)
     targets = load_json(scene_root / "oracle" / "targets.json")
     targets_by_id = {entry["object_id"]: entry for entry in targets}
 

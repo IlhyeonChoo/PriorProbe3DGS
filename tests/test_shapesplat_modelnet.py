@@ -96,7 +96,7 @@ def test_extract_assets_and_build_config(tmp_path: Path) -> None:
     )
     config = build_modelnet_prior_config(
         assets,
-        manifest_path=tmp_path / "outputs" / "pointcloud" / "prior_library" / "manifest.json",
+        manifest_path=tmp_path / "outputs" / "gaussian_direct" / "prior_library" / "manifest.json",
         stage_root=tmp_path / "stage",
         category="chair",
         root=tmp_path,
@@ -107,7 +107,7 @@ def test_extract_assets_and_build_config(tmp_path: Path) -> None:
     assert len(assets) == 1
     assert assets[0].gaussian_path.exists()
     assert (assets[0].render_dir / "000.png").exists()
-    assert config["library"]["manifest_path"] == "outputs/pointcloud/prior_library/manifest.json"
+    assert config["library"]["manifest_path"] == "outputs/gaussian_direct/prior_library/manifest.json"
     object_entry = config["library"]["default_objects"][0]
     assert object_entry["object_id"] == "chair_0001"
     assert object_entry["gaussian_path"].endswith("stage/assets/chair/chair_0001/splat.ply")

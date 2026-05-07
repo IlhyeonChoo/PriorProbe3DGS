@@ -66,6 +66,8 @@ outputs/backend_runs/**/*
 !outputs/backend_runs/**/inspection/**/*.png
 !outputs/backend_runs/**/prior_init/aligned_prior*.ply
 outputs/backend_runs/**/._*
+outputs/**/._*
+outputs/tmp/
 !outputs/prior_library/
 outputs/prior_library/**/*
 !outputs/prior_library/**/
@@ -95,6 +97,7 @@ outputs/*/backend_runs/**/*
 !outputs/*/backend_runs/**/inspection/**/*.png
 !outputs/*/backend_runs/**/prior_init/aligned_prior*.ply
 outputs/*/backend_runs/**/._*
+outputs/*/prior_training/
 !outputs/*/prior_library/
 outputs/*/prior_library/**/*
 !outputs/*/prior_library/**/
