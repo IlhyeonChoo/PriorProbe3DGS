@@ -17,6 +17,10 @@ venv/
 .mypy_cache/
 .ipynb_checkpoints/
 
+# OS metadata
+.DS_Store
+._*
+
 # ML / research intermediates
 *.pt
 *.pth
