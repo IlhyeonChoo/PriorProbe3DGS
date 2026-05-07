@@ -6,8 +6,8 @@ project:
 runtime:
   seed: 42
   device: cuda
-  outputs_dir: outputs/pointcloud
-  logs_dir: logs/pointcloud
+  outputs_dir: outputs
+  logs_dir: logs
 
 metrics:
   primary:

@@ -452,6 +452,7 @@ def build_prior_library(config: dict[str, Any], *, root: Path) -> PriorLibrary:
             else None,
             tags=tuple(str(tag) for tag in item.get("tags", [])),
             extras={
+                **dict(item.get("metadata_extras", {})),
                 "source_split": item.get("source_split"),
                 "render_dir": str(render_dir) if render_dir else None,
                 "render_count": render_count,

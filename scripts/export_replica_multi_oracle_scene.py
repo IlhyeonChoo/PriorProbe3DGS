@@ -34,6 +34,18 @@ def main() -> int:
     parser.add_argument("--radius-min", default=1.0, type=float)
     parser.add_argument("--radius-max", default=2.5, type=float)
     parser.add_argument("--min-visible-ratio", default=0.15, type=float)
+    parser.add_argument(
+        "--selection-mode",
+        choices=["top_visibility", "diverse_azimuth", "room_wide_diverse_azimuth", "room_wide_balanced_azimuth_v2"],
+        default="top_visibility",
+    )
+    parser.add_argument(
+        "--camera-target-mode",
+        choices=["scene_focus", "room_center"],
+        default="scene_focus",
+    )
+    parser.add_argument("--azimuth-bin-count", default=8, type=int)
+    parser.add_argument("--candidate-pose-count", type=int)
     parser.add_argument("--render-point-count", default=1000000, type=int)
     args = parser.parse_args()
 
@@ -53,6 +65,10 @@ def main() -> int:
         radius_min=args.radius_min,
         radius_max=args.radius_max,
         min_visible_ratio=args.min_visible_ratio,
+        selection_mode=args.selection_mode,
+        camera_target_mode=args.camera_target_mode,
+        azimuth_bin_count=args.azimuth_bin_count,
+        candidate_pose_count=args.candidate_pose_count,
         render_point_count=args.render_point_count,
     )
     print(scene_root)

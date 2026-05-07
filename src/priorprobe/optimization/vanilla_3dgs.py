@@ -45,8 +45,26 @@ class Vanilla3DGSBackendConfig:
     quiet: bool = False
     dry_run: bool = False
     init_mode: str = "merge"
+    prior_protection_mode: str = "none"
+    prior_lr_scale: float = 0.05
+    protect_prior_from_prune: bool = True
+    protect_prior_from_densify: bool = True
+    prior_sh_reset_mode: str = "none"
+    prior_target_total_gaussians: int = 0
+    prior_subsample_seed: int = 42
+    sfm_region_replacement_mode: str = "none"
+    sfm_region_margin_scale: float = 1.05
+    sfm_region_margin_min_m: float = 0.02
+    geometry_validation_outside_scene_proxy_ratio_threshold: float = 0.01
+    geometry_validation_mean_nn_threshold_m: float = 0.5
+    geometry_validation_max_prior_points: int = 2048
+    geometry_validation_max_scene_points: int = 8192
     save_initial_snapshot: bool = False
     initial_render_sets: tuple[str, ...] = ()
+    seed: int = 42
+    camera_order_seed: int | None = None
+    camera_shuffle_enabled: bool = True
+    deterministic: bool = False
     extra_args: tuple[str, ...] = ()
 
     @classmethod
@@ -109,8 +127,38 @@ class Vanilla3DGSBackendConfig:
             quiet=bool(payload.get("quiet", False)),
             dry_run=dry_run,
             init_mode=str(payload.get("init_mode", "merge")),
+            prior_protection_mode=str(payload.get("prior_protection_mode", "none")),
+            prior_lr_scale=float(payload.get("prior_lr_scale", 0.05)),
+            protect_prior_from_prune=bool(payload.get("protect_prior_from_prune", True)),
+            protect_prior_from_densify=bool(payload.get("protect_prior_from_densify", True)),
+            prior_sh_reset_mode=str(payload.get("prior_sh_reset_mode", "none")),
+            prior_target_total_gaussians=int(payload.get("prior_target_total_gaussians", 0)),
+            prior_subsample_seed=int(payload.get("prior_subsample_seed", 42)),
+            sfm_region_replacement_mode=str(payload.get("sfm_region_replacement_mode", "none")),
+            sfm_region_margin_scale=float(payload.get("sfm_region_margin_scale", 1.05)),
+            sfm_region_margin_min_m=float(payload.get("sfm_region_margin_min_m", 0.02)),
+            geometry_validation_outside_scene_proxy_ratio_threshold=float(
+                payload.get("geometry_validation_outside_scene_proxy_ratio_threshold", 0.01)
+            ),
+            geometry_validation_mean_nn_threshold_m=float(
+                payload.get("geometry_validation_mean_nn_threshold_m", 0.5)
+            ),
+            geometry_validation_max_prior_points=int(
+                payload.get("geometry_validation_max_prior_points", 2048)
+            ),
+            geometry_validation_max_scene_points=int(
+                payload.get("geometry_validation_max_scene_points", 8192)
+            ),
             save_initial_snapshot=bool(artifacts_payload.get("save_initial_snapshot", False)),
             initial_render_sets=_as_str_tuple(artifacts_payload.get("initial_render_sets")),
+            seed=int(payload.get("seed", 42)),
+            camera_order_seed=(
+                int(payload["camera_order_seed"])
+                if payload.get("camera_order_seed") is not None
+                else None
+            ),
+            camera_shuffle_enabled=bool(payload.get("camera_shuffle_enabled", True)),
+            deterministic=bool(payload.get("deterministic", False)),
             extra_args=_as_str_tuple(payload.get("extra_args")),
         )
 
@@ -176,12 +224,53 @@ def build_train_command(
     if config.initial_render_sets:
         command.append("--initial-render-sets")
         command.extend(config.initial_render_sets)
+    command.extend(["--seed", str(config.seed)])
+    if config.camera_order_seed is not None:
+        command.extend(["--camera-order-seed", str(config.camera_order_seed)])
+    command.append("--camera-shuffle" if config.camera_shuffle_enabled else "--no-camera-shuffle")
+    if config.deterministic:
+        command.append("--deterministic")
 
     if prior_ply is not None:
         command.extend(["--prior-ply", str(prior_ply)])
         command.extend(["--init-mode", config.init_mode])
     elif prior_spec_json is not None:
         command.extend(["--init-mode", config.init_mode])
+    if prior_ply is not None or prior_spec_json is not None:
+        command.extend(["--prior-protection-mode", config.prior_protection_mode])
+        command.extend(["--prior-lr-scale", str(config.prior_lr_scale)])
+        command.extend(["--prior-sh-reset-mode", config.prior_sh_reset_mode])
+        command.extend(["--prior-target-total-gaussians", str(config.prior_target_total_gaussians)])
+        command.extend(["--prior-subsample-seed", str(config.prior_subsample_seed)])
+        command.extend(["--sfm-region-replacement-mode", config.sfm_region_replacement_mode])
+        command.extend(["--sfm-region-margin-scale", str(config.sfm_region_margin_scale)])
+        command.extend(["--sfm-region-margin-min-m", str(config.sfm_region_margin_min_m)])
+        command.extend([
+            "--geometry-validation-outside-scene-proxy-ratio-threshold",
+            str(config.geometry_validation_outside_scene_proxy_ratio_threshold),
+        ])
+        command.extend([
+            "--geometry-validation-mean-nn-threshold-m",
+            str(config.geometry_validation_mean_nn_threshold_m),
+        ])
+        command.extend([
+            "--geometry-validation-max-prior-points",
+            str(config.geometry_validation_max_prior_points),
+        ])
+        command.extend([
+            "--geometry-validation-max-scene-points",
+            str(config.geometry_validation_max_scene_points),
+        ])
+        command.append(
+            "--protect-prior-from-prune"
+            if config.protect_prior_from_prune
+            else "--no-protect-prior-from-prune"
+        )
+        command.append(
+            "--protect-prior-from-densify"
+            if config.protect_prior_from_densify
+            else "--no-protect-prior-from-densify"
+        )
     if alignment_json is not None:
         command.extend(["--alignment-json", str(alignment_json)])
     if prior_object_id is not None:
