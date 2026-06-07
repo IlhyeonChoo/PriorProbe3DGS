@@ -52,6 +52,7 @@ oracle prior는 아래 3개 조건으로 단계적으로 세분화한다.
 
 - 바닐라 3DGS는 개인 fork 레포에 고정하여 사용한다.
 - Fork URL 및 commit hash: 추후 기록 예정
+- 현재는 로컬에 존재하는 3DGS 코드를 사용
 - `scripts/train_vanilla_3dgs_backend.py`는 실행 시 backend 레포의 commit hash를 로그에 자동 출력한다.
 
 ## Repository Layout
